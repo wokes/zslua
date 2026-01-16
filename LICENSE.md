@@ -1,8 +1,11 @@
 MIT License
 
 Copyright (c) 2026 [wokes](https://github.com/wokes)
+
 Copyright (c) 2025 Linden Lab
+
 Copyright (c) 2019-2025 Roblox Corporation
+
 Copyright (c) 1994–2019 Lua.org, PUC-Rio.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
