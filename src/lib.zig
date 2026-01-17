@@ -4541,6 +4541,246 @@ pub const Lua = opaque {
         _ = c.luaopen_cjson(@ptrCast(lua));
     }
 
+    /// Set up the LLEvents metatable for event management
+    ///
+    /// This creates the metatable used by the LLEvents userdata type which handles
+    /// event registration (on/off/once) and dispatch for LSL scripts.
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `0`
+    /// * Errors: `other`
+    pub fn setupLLEventsMetatable(lua: *Lua, expose_internal_funcs: bool) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        c.luaSL_setup_llevents_metatable(@ptrCast(lua), if (expose_internal_funcs) 1 else 0);
+    }
+
+    /// Set up the DetectedEvent metatable
+    ///
+    /// This creates the metatable used by DetectedEvent userdata which wraps
+    /// detected object information in touch/collision/sensor events.
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `0`
+    /// * Errors: `other`
+    pub fn setupDetectedEventMetatable(lua: *Lua) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        c.luaSL_setup_detectedevent_metatable(@ptrCast(lua));
+    }
+
+    /// Create a new LLEvents event manager and push it onto the stack
+    ///
+    /// Creates a new LLEvents userdata that can be used to register and dispatch events.
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `1` (the LLEvents userdata)
+    /// * Errors: `memory`
+    pub fn createEventManager(lua: *Lua) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        _ = c.luaSL_createeventmanager(@ptrCast(lua));
+    }
+
+    /// Push a DetectedEvent userdata onto the stack
+    ///
+    /// Creates a DetectedEvent wrapper for accessing detected object information
+    /// at the given index. Used internally by multi-event handlers.
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `1` (the DetectedEvent userdata)
+    /// * Errors: `memory`
+    pub fn pushDetectedEvent(lua: *Lua, index: i32, valid: bool, can_change_damage: bool) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        _ = c.luaSL_pushdetectedevent(
+            @ptrCast(lua),
+            index,
+            if (valid) 1 else 0,
+            if (can_change_damage) 1 else 0,
+        );
+    }
+
+    /// Set up the LLTimers metatable for timer management
+    ///
+    /// This creates the metatable used by the LLTimers userdata type which handles
+    /// timer registration (on/once/off) and scheduling for LSL scripts.
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `0`
+    /// * Errors: `other`
+    pub fn setupLLTimersMetatable(lua: *Lua, expose_internal_funcs: bool) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        c.luaSL_setup_llltimers_metatable(@ptrCast(lua), if (expose_internal_funcs) 1 else 0);
+    }
+
+    /// Create a new LLTimers timer manager and push it onto the stack
+    ///
+    /// Creates a new LLTimers userdata that can be used to register and manage timers.
+    /// Requires an LLEvents userdata on top of the stack (will be popped).
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `1` (the LLEvents userdata)
+    /// * Pushes: `1` (the LLTimers userdata)
+    /// * Errors: `memory`
+    pub fn createTimerManager(lua: *Lua) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        _ = c.luaSL_createtimermanager(@ptrCast(lua));
+    }
+
+    /// Push a UUID userdata from a string onto the stack
+    ///
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `1` (the UUID userdata)
+    /// * Errors: `memory`
+    pub fn pushUUID(lua: *Lua, str: []const u8) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        _ = c.luaSL_pushuuidlstring(@ptrCast(lua), str.ptr, str.len);
+    }
+
+    /// Push a UUID userdata from a null-terminated string onto the stack
+    ///
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `1` (the UUID userdata)
+    /// * Errors: `memory`
+    pub fn pushUUIDZ(lua: *Lua, str: [:0]const u8) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        _ = c.luaSL_pushuuidstring(@ptrCast(lua), str.ptr);
+    }
+
+    /// Push a UUID userdata from 16 raw bytes onto the stack
+    ///
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `1` (the UUID userdata)
+    /// * Errors: `memory`
+    pub fn pushUUIDBytes(lua: *Lua, bytes: *const [16]u8) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        _ = c.luaSL_pushuuidbytes(@ptrCast(lua), bytes);
+    }
+
+    /// Push a quaternion userdata onto the stack
+    ///
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `1` (the quaternion userdata)
+    /// * Errors: `memory`
+    pub fn pushQuaternion(lua: *Lua, x: f64, y: f64, z: f64, s: f64) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        _ = c.luaSL_pushquaternion(@ptrCast(lua), x, y, z, s);
+    }
+
+    /// Check and get a UUID at the given stack position
+    ///
+    /// Returns the UUID string and whether it was stored in compressed form.
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `0`
+    /// * Errors: `v` (if not a valid UUID)
+    pub fn checkUUID(lua: *Lua, arg: i32) struct { str: [:0]const u8, compressed: bool } {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        var compressed: c_int = 0;
+        const ptr = c.luaSL_checkuuid(@ptrCast(lua), arg, &compressed);
+        return .{
+            .str = std.mem.span(ptr),
+            .compressed = compressed != 0,
+        };
+    }
+
+    /// Check and get a quaternion at the given stack position
+    ///
+    /// Returns a pointer to 4 floats (x, y, z, s).
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `0`
+    /// * Errors: `v` (if not a valid quaternion)
+    pub fn checkQuaternion(lua: *Lua, arg: i32) *const [4]f32 {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        return @ptrCast(c.luaSL_checkquaternion(@ptrCast(lua), arg));
+    }
+
+    /// Push an LSL native integer onto the stack
+    ///
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `1`
+    /// * Errors: `never`
+    pub fn pushLSLInteger(lua: *Lua, val: i32) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        _ = c.luaSL_pushnativeinteger(@ptrCast(lua), val);
+    }
+
+    /// Push an LSL index-like value (1-based index) onto the stack
+    ///
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `1`
+    /// * Errors: `never`
+    pub fn pushLSLIndex(lua: *Lua, index: i32) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        c.luaSL_pushindexlike(@ptrCast(lua), index);
+    }
+
+    /// Check and get an LSL index-like value at the given stack position
+    ///
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `0`
+    /// * Errors: `v`
+    pub fn checkLSLIndex(lua: *Lua, arg: i32) i32 {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        return c.luaSL_checkindexlike(@ptrCast(lua), arg);
+    }
+
+    /// Push an LSL bool-like value onto the stack
+    ///
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `1`
+    /// * Errors: `never`
+    pub fn pushLSLBool(lua: *Lua, val: bool) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        c.luaSL_pushboollike(@ptrCast(lua), if (val) 1 else 0);
+    }
+
+    /// Get the LSL type of a value at the given stack position
+    ///
+    /// Returns the LSLIType enum value.
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `0`
+    /// * Errors: `never`
+    pub fn getLSLType(lua: *Lua, idx: i32) u8 {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        return c.luaSL_lsl_type(@ptrCast(lua), idx);
+    }
+
+    /// Check if a function was defined with : syntax (has implicit self parameter)
+    ///
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `0`
+    /// * Errors: `never`
+    pub fn isMethodStyle(lua: *Lua, idx: i32) bool {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        return c.luaSL_ismethodstyle(@ptrCast(lua), idx) != 0;
+    }
+
     /// Set LSL builtin constants as globals on this Lua state
     ///
     /// This sets all the LSL builtin constants (like NULL_KEY, ZERO_VECTOR, PI, etc.)
