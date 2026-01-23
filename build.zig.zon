@@ -36,6 +36,9 @@
             .url = "https://github.com/secondlife/slua/archive/refs/tags/v0.704.0.tar.gz",
             .hash = "N-V-__8AAKzbwgC1txo59kUQD1SeAlPKTc7HQTPme_VN-zIU",
         },
+        .zig_tailslide = .{
+            .path = "../zig-tailslide",
+        },
     },
     .paths = .{
         "build.zig",

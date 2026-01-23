@@ -7,6 +7,13 @@
 #include "luaconf.h"
 #include "luacode.h"
 
+// LSL-specific constants (from llsl.h, but avoiding C++ headers)
+#define UTAG_QUATERNION 25
+#define UTAG_UUID 26
+#define UTAG_DETECTED_EVENT 28
+#define UTAG_LLEVENTS 29
+#define UTAG_LLTIMERS 30
+
 // LSL-specific library opening functions
 // These are declared in lualib.h but we ensure they're visible here
 int luaopen_lsl(struct lua_State* L);

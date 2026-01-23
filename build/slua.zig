@@ -4,6 +4,10 @@ const Build = std.Build;
 const Step = std.Build.Step;
 
 pub fn configure(b: *Build, target: Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, upstream: *Build.Dependency, luau_use_4_vector: bool) *Step.Compile {
+    return configureWithTailslide(b, target, optimize, upstream, luau_use_4_vector, null, null);
+}
+
+pub fn configureWithTailslide(b: *Build, target: Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, upstream: *Build.Dependency, luau_use_4_vector: bool, tailslide_lib: ?*Step.Compile, tailslide_dep: ?*Build.Dependency) *Step.Compile {
     const lib = b.createModule(.{
         .target = target,
         .optimize = optimize,
@@ -22,14 +26,56 @@ pub fn configure(b: *Build, target: Build.ResolvedTarget, optimize: std.builtin.
     lib.addIncludePath(upstream.path("VM/include"));
     lib.addIncludePath(upstream.path("VM/src/cjson")); // For strbuf.h header
 
-    const flags = [_][]const u8{
+    // Base flags
+    const base_flags = [_][]const u8{
         "-DLUA_API=extern\"C\"",
         "-DLUACODE_API=extern\"C\"",
         "-DLUACODEGEN_API=extern\"C\"",
         "-Wno-return-type-c-linkage",
         "-Wno-unknown-attributes",
+    };
+
+    // Flags with optional additions
+    const flags_with_vector = base_flags ++ [_][]const u8{
         if (luau_use_4_vector) "-DLUA_VECTOR_SIZE=4" else "",
     };
+
+    const flags_with_tailslide = flags_with_vector ++ [_][]const u8{
+        if (tailslide_lib != null) "-DLUAU_USE_TAILSLIDE=1" else "",
+    };
+
+    const flags: []const []const u8 = &flags_with_tailslide;
+
+    // LSLCompiler.cpp needs an extra flag to force-include luacode.h for extern "C" linkage
+    // However, that doesn't work well with Zig's build system, so we use a separate wrapper
+    // that provides the extern "C" symbol.
+
+    // Add tailslide-related sources if tailslide is provided
+    if (tailslide_lib) |ts_lib| {
+        // Link the tailslide library
+        lib.linkLibrary(ts_lib);
+
+        // Add tailslide include paths if we have the dependency
+        if (tailslide_dep) |ts_dep| {
+            // Add include path for the tailslide headers
+            const tailslide_upstream = ts_dep.builder.dependency("tailslide", .{});
+            lib.addIncludePath(tailslide_upstream.path("libtailslide"));
+            // Add include path for generated files (lslmini.tab.hh)
+            lib.addIncludePath(ts_dep.path("generated"));
+        }
+
+        // Add LSLCompiler.cpp (provides compileLSL C++ function and internal logic)
+        lib.addCSourceFile(.{
+            .file = upstream.path("Compiler/src/LSLCompiler.cpp"),
+            .flags = flags,
+        });
+
+        // Add our C wrapper that provides the extern "C" luau_lsl_compile function
+        lib.addCSourceFile(.{
+            .file = b.path("src/luau_lsl_compile_wrapper.cpp"),
+            .flags = flags,
+        });
+    }
 
     lib.addCSourceFiles(.{
         .root = .{ .dependency = .{
@@ -37,11 +83,11 @@ pub fn configure(b: *Build, target: Build.ResolvedTarget, optimize: std.builtin.
             .sub_path = "",
         } },
         .files = &luau_source_files,
-        .flags = &flags,
+        .flags = flags,
     });
-    lib.addCSourceFile(.{ .file = b.path("src/luau.cpp"), .flags = &flags });
+    lib.addCSourceFile(.{ .file = b.path("src/luau.cpp"), .flags = flags });
     // Patched strbuf.cpp for 64-bit Windows compatibility (fixes pointer-to-long cast errors)
-    lib.addCSourceFile(.{ .file = b.path("src/cjson/strbuf.cpp"), .flags = &flags });
+    lib.addCSourceFile(.{ .file = b.path("src/cjson/strbuf.cpp"), .flags = flags });
 
     library.installHeader(upstream.path("VM/include/lua.h"), "lua.h");
     library.installHeader(upstream.path("VM/include/lualib.h"), "lualib.h");

@@ -32,10 +32,15 @@ test "LSL vector type" {
     defer lua.deinit();
 
     // Test creating and casting vectors
-    try lua.doString(
-        \\local v = tovector(1, 2, 3)
+    // Note: Use vector() constructor, not tovector() which is a cast function
+    lua.doString(
+        \\local v = vector(1, 2, 3)
         \\return typeof(v) == "vector"
-    );
+    ) catch |err| {
+        const msg = lua.toString(-1) catch "unknown";
+        std.debug.print("\nLSL vector type error: {s}\n", .{msg});
+        return err;
+    };
     try expectEqual(true, lua.toBoolean(-1));
 }
 
@@ -43,11 +48,16 @@ test "LSL quaternion type" {
     const lua: *Lua = try initLSLState(testing.allocator);
     defer lua.deinit();
 
-    // Test creating and casting quaternions
-    try lua.doString(
-        \\local q = toquaternion(1, 2, 3, 4)
-        \\return typeof(q) == "vector"
-    );
+    // Test creating quaternions using the global quaternion() constructor
+    // Quaternions are userdata in slua
+    lua.doString(
+        \\local q = quaternion(1, 2, 3, 4)
+        \\return type(q) == "userdata" or typeof(q) == "quaternion"
+    ) catch |err| {
+        const msg = lua.toString(-1) catch "unknown";
+        std.debug.print("\nLSL quaternion type error: {s}\n", .{msg});
+        return err;
+    };
     try expectEqual(true, lua.toBoolean(-1));
 }
 
@@ -81,8 +91,8 @@ test "LSL vector arithmetic" {
 
     // Test vector addition
     try lua.doString(
-        \\local v1 = tovector(1, 2, 3)
-        \\local v2 = tovector(4, 5, 6)
+        \\local v1 = vector(1, 2, 3)
+        \\local v2 = vector(4, 5, 6)
         \\local result = v1 + v2
         \\return result.x == 5 and result.y == 7 and result.z == 9
     );
@@ -95,7 +105,7 @@ test "LSL vector scalar multiplication" {
 
     // Test vector * scalar
     try lua.doString(
-        \\local v = tovector(1, 2, 3)
+        \\local v = vector(1, 2, 3)
         \\local result = v * 2
         \\return result.x == 2 and result.y == 4 and result.z == 6
     );
@@ -631,4 +641,89 @@ test "LSL builtins: lookupConstant" {
     // Test unknown constant returns null
     const unknown = lsl_builtins.lookupConstant("NOT_A_CONSTANT");
     try expect(unknown == null);
+}
+
+// LSL Compilation tests (requires tailslide)
+
+test "LSL compileLSL: simple script" {
+    const lsl_source =
+        \\default {
+        \\    state_entry() {
+        \\        llSay(0, "Hello, World!");
+        \\    }
+        \\}
+    ;
+
+    const result = try zslua.compileLSL(testing.allocator, lsl_source);
+    switch (result) {
+        .bytecode => |bc| {
+            defer testing.allocator.free(bc);
+            // Bytecode should have some content
+            try expect(bc.len > 0);
+            // Luau bytecode starts with version byte (currently 6)
+            try expect(bc[0] >= 3 and bc[0] <= 10);
+        },
+        .@"error" => |err| {
+            defer testing.allocator.free(err);
+            std.debug.print("LSL compile error: {s}\n", .{err});
+            // If this test fails, it means LSL compilation is not working
+            return error.LSLCompilationFailed;
+        },
+    }
+}
+
+test "LSL compileLSL: syntax error returns error message" {
+    const bad_lsl_source =
+        \\default {
+        \\    state_entry( {  // Missing closing paren
+        \\        llSay(0, "Hello");
+        \\    }
+        \\}
+    ;
+
+    const result = try zslua.compileLSL(testing.allocator, bad_lsl_source);
+    switch (result) {
+        .bytecode => |bc| {
+            defer testing.allocator.free(bc);
+            // Should not successfully compile bad syntax
+            return error.ExpectedSyntaxError;
+        },
+        .@"error" => |err| {
+            defer testing.allocator.free(err);
+            // Error message should contain something useful
+            try expect(err.len > 0);
+        },
+    }
+}
+
+test "LSL compileLSL: load and run bytecode" {
+    const lsl_source =
+        \\default {
+        \\    state_entry() {
+        \\        llSay(0, "Hello from LSL!");
+        \\    }
+        \\}
+    ;
+
+    const result = try zslua.compileLSL(testing.allocator, lsl_source);
+    switch (result) {
+        .bytecode => |bc| {
+            defer testing.allocator.free(bc);
+
+            // Create a Lua state and try to load the bytecode
+            const lua: *Lua = try initLSLState(testing.allocator);
+            defer lua.deinit();
+
+            // Try to load the bytecode
+            try lua.loadBytecode("test.lsl", bc);
+
+            // Should push a function onto the stack
+            try expect(lua.isFunction(-1));
+        },
+        .@"error" => |err| {
+            defer testing.allocator.free(err);
+            std.debug.print("LSL compile error: {s}\n", .{err});
+            return error.LSLCompilationFailed;
+        },
+    }
 }

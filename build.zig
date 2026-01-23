@@ -23,7 +23,15 @@ pub fn build(b: *Build) void {
     zslua.addCMacro("LUA_VECTOR_SIZE", b.fmt("{}", .{vector_size}));
 
     if (b.lazyDependency(@tagName(lang), .{})) |upstream| {
-        const lib = slua_setup.configure(b, target, optimize, upstream, false);
+        // Get tailslide library from zig-tailslide dependency
+        var tailslide_lib: ?*Step.Compile = null;
+        var tailslide_dep: ?*Build.Dependency = null;
+        if (b.lazyDependency("zig_tailslide", .{})) |ts_dep| {
+            tailslide_lib = ts_dep.artifact("tailslide");
+            tailslide_dep = ts_dep;
+        }
+
+        const lib = slua_setup.configureWithTailslide(b, target, optimize, upstream, false, tailslide_lib, tailslide_dep);
 
         // Expose the Lua artifact, and get an install step that header translation can refer to
         const install_lib = b.addInstallArtifact(lib, .{});
@@ -73,35 +81,39 @@ pub fn build(b: *Build) void {
         b.modules.put("zslua-c", zslua_c) catch @panic("OOM");
 
         zslua.addImport("c", zslua_c);
+
+        // Tests - must be inside lazyDependency block to access lib
+        const tests = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/tests.zig"),
+                .target = target,
+                .optimize = optimize,
+            }),
+        });
+        tests.root_module.addImport("zslua", zslua);
+        // Explicitly link slua to ensure LSLCompiler.cpp is included
+        tests.root_module.linkLibrary(lib);
+
+        const run_tests = b.addRunArtifact(tests);
+        const test_step = b.step("test", "Run zslua tests");
+        test_step.dependOn(&run_tests.step);
+
+        // LSL-specific tests
+        const lsl_tests = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/lsl_tests.zig"),
+                .target = target,
+                .optimize = optimize,
+            }),
+        });
+        lsl_tests.root_module.addImport("zslua", zslua);
+        // Explicitly link slua to ensure LSLCompiler.cpp is included
+        lsl_tests.root_module.linkLibrary(lib);
+
+        const run_lsl_tests = b.addRunArtifact(lsl_tests);
+        const lsl_test_step = b.step("test-lsl", "Run LSL-specific tests");
+        lsl_test_step.dependOn(&run_lsl_tests.step);
     }
-
-    // Tests
-    const tests = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tests.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-    tests.root_module.addImport("zslua", zslua);
-
-    const run_tests = b.addRunArtifact(tests);
-    const test_step = b.step("test", "Run zslua tests");
-    test_step.dependOn(&run_tests.step);
-
-    // LSL-specific tests
-    const lsl_tests = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/lsl_tests.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-    lsl_tests.root_module.addImport("zslua", zslua);
-
-    const run_lsl_tests = b.addRunArtifact(lsl_tests);
-    const lsl_test_step = b.step("test-lsl", "Run LSL-specific tests");
-    lsl_test_step.dependOn(&run_lsl_tests.step);
 
     const docs = b.addObject(.{
         .name = "zslua",

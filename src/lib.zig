@@ -3523,6 +3523,15 @@ pub const Lua = opaque {
         return c.luaL_checkinteger(@ptrCast(lua), arg);
     }
 
+    /// Checks whether the function argument `arg` is a boolean and returns the boolean value
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `0`
+    /// * Errors: `explained in text / on purpose`
+    pub fn checkBoolean(lua: *Lua, arg: i32) bool {
+        return c.luaL_checkboolean(@ptrCast(lua), arg) != 0;
+    }
+
     /// Checks whether the function argument `arg` is a number and returns the number
     ///
     /// * Pops:   `0`
@@ -4627,6 +4636,45 @@ pub const Lua = opaque {
     pub fn createTimerManager(lua: *Lua) void {
         if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
         _ = c.luaSL_createtimermanager(@ptrCast(lua));
+    }
+
+    /// Get listeners for a specific event from LLEvents
+    ///
+    /// Returns an array of handler functions registered for the given event name.
+    /// Requires an LLEvents userdata at index 1 and event name string at index 2.
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `1` (array of handler functions)
+    /// * Errors: `runtime`, `memory`
+    pub fn getEventListeners(lua: *Lua) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        // Get metatable of the userdata at index 1
+        lua.getMetatable(1) catch unreachable;
+        _ = lua.getField(-1, "listeners");
+        lua.remove(-2); // Remove metatable
+        lua.pushValue(1); // LLEvents userdata
+        lua.pushValue(2); // event name
+        lua.call(.{ .args = 2, .results = 1 });
+    }
+
+    /// Get all event names that have registered handlers
+    ///
+    /// Returns an array of event name strings that have at least one registered handler.
+    /// Requires an LLEvents userdata at index 1.
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `1` (array of event name strings)
+    /// * Errors: `runtime`, `memory`
+    pub fn getEventNames(lua: *Lua) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        // Get metatable of the userdata at index 1
+        lua.getMetatable(1) catch unreachable;
+        _ = lua.getField(-1, "eventNames");
+        lua.remove(-2); // Remove metatable
+        lua.pushValue(1); // LLEvents userdata
+        lua.call(.{ .args = 1, .results = 1 });
     }
 
     /// Push a UUID userdata from a string onto the stack
@@ -5839,6 +5887,47 @@ pub fn compile(allocator: Allocator, source: []const u8, options: CompileOptions
     if (bytecode == null) return error.OutOfMemory;
     defer zig_luau_free(bytecode);
     return try allocator.dupe(u8, bytecode[0..size]);
+}
+
+/// Error type for LSL compilation
+pub const LSLCompileError = error{
+    /// LSL source code has syntax or semantic errors
+    Syntax,
+    /// Failed to allocate memory for bytecode
+    OutOfMemory,
+};
+
+/// Result of LSL compilation
+pub const LSLCompileResult = union(enum) {
+    /// Successfully compiled bytecode
+    bytecode: []const u8,
+    /// Compilation error message
+    @"error": []const u8,
+};
+
+/// Compile LSL source into Luau bytecode using slua's LSL compiler.
+/// This requires zslua to be built with tailslide support.
+/// Returns either the compiled bytecode or an error message.
+pub fn compileLSL(allocator: Allocator, source: []const u8) LSLCompileError!LSLCompileResult {
+    var size: usize = 0;
+    var is_error: bool = false;
+
+    const result = c.luau_lsl_compile(source.ptr, source.len, &size, &is_error);
+    if (result == null) return error.OutOfMemory;
+
+    // luau_lsl_compile uses malloc, so we need to copy and free
+    const data = result[0..size];
+    const owned = allocator.dupe(u8, data) catch {
+        zig_luau_free(result);
+        return error.OutOfMemory;
+    };
+    zig_luau_free(result);
+
+    if (is_error) {
+        return .{ .@"error" = owned };
+    } else {
+        return .{ .bytecode = owned };
+    }
 }
 
 /// Export a Zig function to be used as a the entry point to a Lua module
