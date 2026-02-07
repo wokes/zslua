@@ -33,8 +33,8 @@
     // internet connectivity.
     .dependencies = .{
         .slua = .{
-            .url = "https://github.com/secondlife/slua/archive/refs/tags/v0.704.0.tar.gz",
-            .hash = "N-V-__8AAKzbwgC1txo59kUQD1SeAlPKTc7HQTPme_VN-zIU",
+            .url = "https://github.com/secondlife/slua/archive/refs/tags/v0.707.0.tar.gz",
+            .hash = "N-V-__8AAAoDxgCy3PaZiPl8mhQWsFWodfUCNmfnxhr9l5rB",
         },
         .zig_tailslide = .{
             .path = "../zig-tailslide",
