@@ -380,6 +380,10 @@ pub const FnReg = struct {
 /// The index of the global environment table
 pub const globals_index = c.LUA_GLOBALSINDEX;
 
+/// ServerLua identifier flags for runtime state
+pub const LUA_SL_IDENTIFIER = c.LUA_SL_IDENTIFIER;
+pub const LUA_LSL_IDENTIFIER = c.LUA_LSL_IDENTIFIER;
+
 /// Type for debugging hook functions
 pub const CHookFn = *const fn (state: ?*LuaState, ar: ?*Debug) callconv(.c) void;
 
@@ -746,6 +750,19 @@ pub const Lua = opaque {
         if (ptr) |runtime_state_ptr| {
             lua.allocator().destroy(@as(*RuntimeState, @ptrCast(@alignCast(runtime_state_ptr))));
             c.lua_setthreaddata(@ptrCast(lua), null);
+        }
+    }
+
+    /// Set the SL identifier flag on the runtime state
+    /// Must be called after initLSLThreadData
+    /// Only available in slua (ServerLua/Luau fork)
+    pub fn setSlIdentifier(lua: *Lua, identifier: c_uint) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+
+        const ptr = c.lua_getthreaddata(@ptrCast(lua));
+        if (ptr) |runtime_state_ptr| {
+            const runtime_state: *RuntimeState = @ptrCast(@alignCast(runtime_state_ptr));
+            runtime_state.slIdentifier = identifier;
         }
     }
 
