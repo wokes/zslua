@@ -115,6 +115,9 @@ pub const CUserdataDtorFn = *const fn (userdata: *anyopaque) callconv(.c) void;
 /// Type for C interrupt callback
 pub const CInterruptCallbackFn = *const fn (state: ?*LuaState, gc: c_int) callconv(.c) void;
 
+/// Type for C userthread callback - called when a coroutine is created (LP = parent) or destroyed (LP = null)
+pub const CUserThreadCallbackFn = *const fn (parent: ?*LuaState, child: ?*LuaState) callconv(.c) void;
+
 /// Type for C useratom callback
 pub const CUserAtomCallbackFn = *const fn (str: [*c]const u8, len: usize) callconv(.c) i16;
 
@@ -717,11 +720,24 @@ pub const Lua = opaque {
         }
     }
 
+    /// Internal userthread callback - propagates thread data from parent to child coroutines.
+    /// This is essential for LSL native types (uuid, vector, etc.) to work in coroutines.
+    fn userthreadCallback(parent: ?*LuaState, child: ?*LuaState) callconv(.c) void {
+        // parent is null when the child thread is being destroyed
+        if (parent == null) return;
+        // Propagate thread data from parent to child coroutine
+        const threaddata = c.lua_getthreaddata(parent.?);
+        c.lua_setthreaddata(child.?, threaddata);
+    }
+
     /// Initialize LSL (Linden Scripting Language) thread data on this Lua state
     /// This must be called before using any LSL-specific features
     /// Only available in slua (ServerLua/Luau fork)
     ///
     /// The runtime state is automatically freed when lua.deinit() is called
+    ///
+    /// Also registers the userthread callback to propagate thread data to coroutines,
+    /// which is required for native LSL types (uuid, vector, rotation) to work in coroutines.
     pub fn initLSLThreadData(lua: *Lua, a: Allocator) !void {
         if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
 
@@ -738,6 +754,13 @@ pub const Lua = opaque {
         };
 
         c.lua_setthreaddata(@ptrCast(lua), runtime_state);
+
+        // Register userthread callback to propagate thread data to coroutines
+        // This mirrors the implementation in official slua (Repl.cpp):
+        // lua_callbacks(L)->userthread = userthread_callback;
+        if (c.lua_callbacks(@ptrCast(lua))) |cb_struct| {
+            cb_struct.*.userthread = userthreadCallback;
+        }
     }
 
     /// Deinitialize LSL thread data, freeing the runtime state
@@ -3378,6 +3401,25 @@ pub const Lua = opaque {
         if (lang != .luau) @compileError(@src().fn_name ++ " is only available in Luau.");
         if (c.lua_callbacks(@ptrCast(lua))) |cb_struct| {
             cb_struct.*.useratom = cb;
+        }
+    }
+
+    /// Sets the userthread callback, which is called when a coroutine is created or destroyed.
+    /// This is essential for propagating thread data (like LSL runtime state) to coroutines.
+    ///
+    /// The callback receives (parent, child) where:
+    /// - parent is the parent thread (non-null when child is created)
+    /// - parent is null when child is being destroyed
+    ///
+    /// Only available in Luau/slua.
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `0`
+    /// * Errors: `never`
+    pub fn setUserThreadCallback(lua: *Lua, cb: ?CUserThreadCallbackFn) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in Luau.");
+        if (c.lua_callbacks(@ptrCast(lua))) |cb_struct| {
+            cb_struct.*.userthread = cb;
         }
     }
 
