@@ -22,6 +22,10 @@ pub const define = def.define;
 /// Only available for slua (Luau with LSL extensions)
 pub const lsl_builtins = @import("lsl_builtins.zig");
 
+/// SLua builtins module - provides type-correct constants for SLua mode
+/// Uses slua_default.d.luau declarations to ensure proper types (e.g., uuid instead of key)
+pub const slua_builtins = @import("slua_builtins.zig");
+
 // const config = @import("config");
 const config = struct {
     pub const @"build.lua.Language" = enum(u3) {
@@ -4924,6 +4928,48 @@ pub const Lua = opaque {
     pub fn deinitLSLBuiltins() void {
         if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
         lsl_builtins.deinitGlobalBuiltins();
+    }
+
+    /// Set SLua builtin constants as globals on this Lua state with correct SLua types
+    ///
+    /// This sets all the LSL builtin constants (like NULL_KEY, ZERO_VECTOR, PI, etc.)
+    /// as global variables in the Lua state, using the correct SLua types from
+    /// slua_default.d.luau (e.g., NULL_KEY as uuid userdata instead of string).
+    /// Call initSLuaBuiltins first to load the constants.
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `0`
+    /// * Errors: `never`
+    pub fn setSLuaConstantGlobals(lua: *Lua) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        slua_builtins.setSLuaConstantGlobals(lua);
+    }
+
+    /// Initialize SLua builtins from embedded data or files
+    ///
+    /// This parses both LSL constants (for values) and SLua declarations (for types).
+    /// If lsl_builtins_file is null, uses the embedded LSL builtins data.
+    /// If slua_defs_file is null, uses the embedded SLua definitions data.
+    /// This should be called once at startup before using setSLuaConstantGlobals.
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `0`
+    /// * Errors: `memory`
+    pub fn initSLuaBuiltins(gpa: std.mem.Allocator, lsl_builtins_file: ?[]const u8, slua_defs_file: ?[]const u8) !void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        try slua_builtins.initSLuaBuiltins(gpa, lsl_builtins_file, slua_defs_file);
+    }
+
+    /// Deinitialize global SLua builtins and free memory
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `0`
+    pub fn deinitSLuaBuiltins() void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        slua_builtins.deinitSLuaBuiltins();
     }
 
     /// Returns if given typeinfo is a string type
