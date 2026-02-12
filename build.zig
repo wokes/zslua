@@ -14,6 +14,25 @@ pub fn build(b: *Build) void {
 
     const lang = .slua;
 
+    // =========================================================================
+    // Fetch definitions step (optional, run with `zig build fetch-defs`)
+    // Downloads up-to-date builtins.txt and slua_default.d.luau from GitHub
+    // =========================================================================
+    const native_target = b.resolveTargetQuery(.{});
+    const fetch_exe = b.addExecutable(.{
+        .name = "fetch_definitions",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("build/fetch_definitions.zig"),
+            .target = native_target,
+        }),
+    });
+    const run_fetch = b.addRunArtifact(fetch_exe);
+    run_fetch.addArg("src/builtins_data.txt");
+    run_fetch.addArg("src/slua_default.d.luau");
+
+    const fetch_step = b.step("fetch-defs", "Download latest LSL/SLua definitions from GitHub");
+    fetch_step.dependOn(&run_fetch.step);
+
     // Zig module
     const zslua = b.addModule("zslua", .{
         .root_source_file = b.path("src/lib.zig"),
@@ -45,7 +64,6 @@ pub fn build(b: *Build) void {
         zslua.linkLibrary(lib);
 
         // Create patched lua.h for translate-c (removes C++ headers)
-        const native_target = b.resolveTargetQuery(.{});
         const patch_exe = b.addExecutable(.{
             .name = "patch_lua_h",
             .root_module = b.createModule(.{
