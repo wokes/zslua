@@ -4613,6 +4613,20 @@ pub const Lua = opaque {
         _ = c.luaopen_cjson(@ptrCast(lua));
     }
 
+    /// Open the llbase64 (Base64) library
+    ///
+    /// This provides Base64 encoding/decoding functions via the llbase64 global.
+    /// Functions include llbase64.encode(), llbase64.decode(), etc.
+    /// Only available in slua (ServerLua)
+    ///
+    /// * Pops:   `0`
+    /// * Pushes: `1` (the llbase64 module table)
+    /// * Errors: `other`
+    pub fn openLLBase64(lua: *Lua) void {
+        if (lang != .luau) @compileError(@src().fn_name ++ " is only available in slua (Luau fork).");
+        _ = c.luaopen_llbase64(@ptrCast(lua));
+    }
+
     /// Set up the LLEvents metatable for event management
     ///
     /// This creates the metatable used by the LLEvents userdata type which handles
