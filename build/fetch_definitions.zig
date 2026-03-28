@@ -5,7 +5,7 @@
 
 const std = @import("std");
 
-const BUILTINS_URL = "https://raw.githubusercontent.com/secondlife/slua/main/builtins.txt";
+const BUILTINS_URL = "https://raw.githubusercontent.com/secondlife/lsl-definitions/main/generated/builtins.txt";
 const SLUA_DEFS_URL = "https://raw.githubusercontent.com/secondlife/lsl-definitions/main/generated/slua_default.d.luau";
 
 pub fn main() !void {
