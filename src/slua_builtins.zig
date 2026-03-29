@@ -272,11 +272,8 @@ threadlocal var global_slua_builtins: ?SLuaBuiltinsDatabase = null;
 /// If lsl_builtins_file is null, uses embedded LSL builtins data.
 /// If slua_defs_file is null, uses embedded SLua definitions data.
 pub fn initSLuaBuiltins(allocator: Allocator, lsl_builtins_file: ?[]const u8, slua_defs_file: ?[]const u8) !void {
-    if (global_slua_builtins) |*existing| {
-        existing.deinit();
-    }
-
     var db = SLuaBuiltinsDatabase.init(allocator);
+    errdefer db.deinit();
 
     // Load LSL builtins (values)
     var lsl_content: []const u8 = lsl_builtins.embedded_builtins_data;
@@ -309,6 +306,13 @@ pub fn initSLuaBuiltins(allocator: Allocator, lsl_builtins_file: ?[]const u8, sl
     }
 
     try db.parseBuiltins(lsl_content, slua_content);
+
+    // Only tear down the old database after the new one is fully ready.
+    // Doing this before parseBuiltins would leave global_slua_builtins
+    // in a non-null but undefined state if any of the above steps fail.
+    if (global_slua_builtins) |*existing| {
+        existing.deinit();
+    }
     global_slua_builtins = db;
 }
 

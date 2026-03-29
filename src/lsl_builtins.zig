@@ -289,11 +289,8 @@ threadlocal var global_builtins: ?BuiltinsDatabase = null;
 /// This matches slua's luauSL_init_global_builtins()
 /// If builtins_file is null, uses embedded builtins data.
 pub fn initGlobalBuiltins(allocator: Allocator, builtins_file: ?[]const u8) !void {
-    if (global_builtins) |*existing| {
-        existing.deinit();
-    }
-
     var db = BuiltinsDatabase.init(allocator);
+    errdefer db.deinit();
 
     if (builtins_file) |path| {
         // Load from file
@@ -312,6 +309,10 @@ pub fn initGlobalBuiltins(allocator: Allocator, builtins_file: ?[]const u8) !voi
         try db.parseBuiltins(embedded_builtins_data);
     }
 
+    // Only tear down the old database after the new one is fully ready
+    if (global_builtins) |*existing| {
+        existing.deinit();
+    }
     global_builtins = db;
 }
 
