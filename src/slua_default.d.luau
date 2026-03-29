@@ -21,7 +21,7 @@ end
 
 declare extern type uuid with
   istruthy: boolean
-  bytes: string?
+  bytes: string
   function __tostring(self): string
 end
 
@@ -60,13 +60,29 @@ export type OsDateTime = {
   yday: number?,
   isdst: boolean?,
 }
+type LLJsonEncodeOptions = {
+  tight: boolean?,
+  skip_tojson: boolean?,
+  allow_sparse: boolean?,
+  replacer: ((key: any, value: any, parent: {}?) -> any)?,
+}
+type LLJsonDecodeReviverWithoutPath = (key: string | number, value: any, parent: {}?, ctx: {}) -> any
+type LLJsonDecodeOptionsWithoutPath = {
+  track_path: false?,
+  reviver: LLJsonDecodeReviverWithoutPath?,
+} | LLJsonDecodeReviverWithoutPath
+type LLJsonDecodeOptionsWithPath = {
+  track_path: true,
+  reviver: (key: string | number, value: any, parent: {}?, ctx: {path: {string | number}}) -> any
+}
+type LLJsonDecodeOptions = LLJsonDecodeOptionsWithoutPath | LLJsonDecodeOptionsWithPath
 
 declare extern type DetectedEvent with
   index: number
   valid: boolean
   canAdjustDamage: boolean
   function adjustDamage(self, Damage: number): ()
-  function getDamage(self): list
+  function getDamage(self): {any}
   function getGrab(self): vector
   function getGroup(self): boolean
   function getKey(self): uuid
@@ -100,9 +116,9 @@ declare extern type LLEvents with
   experience_permissions: ((agent_id: uuid) -> ())?
   experience_permissions_denied: ((agent_id: uuid, Reason: number) -> ())?
   final_damage: LLDetectedEventHandler?
-  game_control: ((id: uuid, buttons: number, axes: list) -> ())?
+  game_control: ((id: uuid, buttons: number, axes: {number}) -> ())?
   http_request: ((HTTPRequestID: uuid, HTTPMethod: string, Body: string) -> ())?
-  http_response: ((HTTPRequestID: uuid, Status: number, Metadata: list, Body: string) -> ())?
+  http_response: ((HTTPRequestID: uuid, Status: number, Metadata: {any}, Body: string) -> ())?
   land_collision: ((Position: vector) -> ())?
   land_collision_end: ((Position: vector) -> ())?
   land_collision_start: ((Position: vector) -> ())?
@@ -119,7 +135,7 @@ declare extern type LLEvents with
   on_damage: LLDetectedEventHandler?
   on_death: (() -> ())?
   on_rez: ((StartParameter: number) -> ())?
-  path_update: ((Type: number, Reserved: list) -> ())?
+  path_update: ((Type: number, Reserved: {any}) -> ())?
   remote_data: ((EventType: number, ChannelID: uuid, MessageID: uuid, Sender: string, IData: number, SData: string) -> ())?
   run_time_permissions: ((PermissionFlags: number) -> ())?
   sensor: LLDetectedEventHandler?
@@ -127,107 +143,14 @@ declare extern type LLEvents with
   touch: LLDetectedEventHandler?
   touch_end: LLDetectedEventHandler?
   touch_start: LLDetectedEventHandler?
-  transaction_result: ((RequestID: uuid, Success: number, Message: string) -> ())?
+  transaction_result: ((RequestID: uuid, Success: boolean, Message: string) -> ())?
   on: ((self: LLEvents, event: LLDetectedEventName, callback: LLDetectedEventHandler) -> LLDetectedEventHandler)
-    & ((self: LLEvents, event: "at_rot_target", callback: (TargetNumber: number, TargetRotation: quaternion, CurrentRotation: quaternion) -> ()) -> (TargetNumber: number, TargetRotation: quaternion, CurrentRotation: quaternion) -> ())
-    & ((self: LLEvents, event: "at_target", callback: (TargetNumber: number, TargetPosition: vector, CurrentPosition: vector) -> ()) -> (TargetNumber: number, TargetPosition: vector, CurrentPosition: vector) -> ())
-    & ((self: LLEvents, event: "attach", callback: (AvatarID: uuid) -> ()) -> (AvatarID: uuid) -> ())
-    & ((self: LLEvents, event: "changed", callback: (Changed: number) -> ()) -> (Changed: number) -> ())
-    & ((self: LLEvents, event: "control", callback: (AvatarID: uuid, Levels: number, Edges: number) -> ()) -> (AvatarID: uuid, Levels: number, Edges: number) -> ())
-    & ((self: LLEvents, event: "dataserver", callback: (RequestID: uuid, Data: string) -> ()) -> (RequestID: uuid, Data: string) -> ())
-    & ((self: LLEvents, event: "email", callback: (Time: string, Address: string, Subject: string, Body: string, NumberRemaining: number) -> ()) -> (Time: string, Address: string, Subject: string, Body: string, NumberRemaining: number) -> ())
-    & ((self: LLEvents, event: "experience_permissions", callback: (agent_id: uuid) -> ()) -> (agent_id: uuid) -> ())
-    & ((self: LLEvents, event: "experience_permissions_denied", callback: (agent_id: uuid, Reason: number) -> ()) -> (agent_id: uuid, Reason: number) -> ())
-    & ((self: LLEvents, event: "game_control", callback: (id: uuid, buttons: number, axes: list) -> ()) -> (id: uuid, buttons: number, axes: list) -> ())
-    & ((self: LLEvents, event: "http_request", callback: (HTTPRequestID: uuid, HTTPMethod: string, Body: string) -> ()) -> (HTTPRequestID: uuid, HTTPMethod: string, Body: string) -> ())
-    & ((self: LLEvents, event: "http_response", callback: (HTTPRequestID: uuid, Status: number, Metadata: list, Body: string) -> ()) -> (HTTPRequestID: uuid, Status: number, Metadata: list, Body: string) -> ())
-    & ((self: LLEvents, event: "land_collision", callback: (Position: vector) -> ()) -> (Position: vector) -> ())
-    & ((self: LLEvents, event: "land_collision_end", callback: (Position: vector) -> ()) -> (Position: vector) -> ())
-    & ((self: LLEvents, event: "land_collision_start", callback: (Position: vector) -> ()) -> (Position: vector) -> ())
-    & ((self: LLEvents, event: "link_message", callback: (SendersLink: number, Value: number, Text: string, ID: string) -> ()) -> (SendersLink: number, Value: number, Text: string, ID: string) -> ())
-    & ((self: LLEvents, event: "linkset_data", callback: (action: number, name: string, value: string) -> ()) -> (action: number, name: string, value: string) -> ())
-    & ((self: LLEvents, event: "listen", callback: (Channel: number, Name: string, ID: uuid, Text: string) -> ()) -> (Channel: number, Name: string, ID: uuid, Text: string) -> ())
-    & ((self: LLEvents, event: "money", callback: (Payer: uuid, Amount: number) -> ()) -> (Payer: uuid, Amount: number) -> ())
-    & ((self: LLEvents, event: "moving_end", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "moving_start", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "no_sensor", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "not_at_rot_target", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "not_at_target", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "object_rez", callback: (RezzedObjectsID: uuid) -> ()) -> (RezzedObjectsID: uuid) -> ())
-    & ((self: LLEvents, event: "on_death", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "on_rez", callback: (StartParameter: number) -> ()) -> (StartParameter: number) -> ())
-    & ((self: LLEvents, event: "path_update", callback: (Type: number, Reserved: list) -> ()) -> (Type: number, Reserved: list) -> ())
-    & ((self: LLEvents, event: "remote_data", callback: (EventType: number, ChannelID: uuid, MessageID: uuid, Sender: string, IData: number, SData: string) -> ()) -> (EventType: number, ChannelID: uuid, MessageID: uuid, Sender: string, IData: number, SData: string) -> ())
-    & ((self: LLEvents, event: "run_time_permissions", callback: (PermissionFlags: number) -> ()) -> (PermissionFlags: number) -> ())
-    & ((self: LLEvents, event: "timer", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "transaction_result", callback: (RequestID: uuid, Success: number, Message: string) -> ()) -> (RequestID: uuid, Success: number, Message: string) -> ())
+    & ((self: LLEvents, event: LLNonDetectedEventName, callback: LLEventHandler) -> LLEventHandler)
   off: ((self: LLEvents, event: LLDetectedEventName, callback: LLDetectedEventHandler) -> boolean)
-    & ((self: LLEvents, event: "at_rot_target", callback: (TargetNumber: number, TargetRotation: quaternion, CurrentRotation: quaternion) -> ()) -> boolean)
-    & ((self: LLEvents, event: "at_target", callback: (TargetNumber: number, TargetPosition: vector, CurrentPosition: vector) -> ()) -> boolean)
-    & ((self: LLEvents, event: "attach", callback: (AvatarID: uuid) -> ()) -> boolean)
-    & ((self: LLEvents, event: "changed", callback: (Changed: number) -> ()) -> boolean)
-    & ((self: LLEvents, event: "control", callback: (AvatarID: uuid, Levels: number, Edges: number) -> ()) -> boolean)
-    & ((self: LLEvents, event: "dataserver", callback: (RequestID: uuid, Data: string) -> ()) -> boolean)
-    & ((self: LLEvents, event: "email", callback: (Time: string, Address: string, Subject: string, Body: string, NumberRemaining: number) -> ()) -> boolean)
-    & ((self: LLEvents, event: "experience_permissions", callback: (agent_id: uuid) -> ()) -> boolean)
-    & ((self: LLEvents, event: "experience_permissions_denied", callback: (agent_id: uuid, Reason: number) -> ()) -> boolean)
-    & ((self: LLEvents, event: "game_control", callback: (id: uuid, buttons: number, axes: list) -> ()) -> boolean)
-    & ((self: LLEvents, event: "http_request", callback: (HTTPRequestID: uuid, HTTPMethod: string, Body: string) -> ()) -> boolean)
-    & ((self: LLEvents, event: "http_response", callback: (HTTPRequestID: uuid, Status: number, Metadata: list, Body: string) -> ()) -> boolean)
-    & ((self: LLEvents, event: "land_collision", callback: (Position: vector) -> ()) -> boolean)
-    & ((self: LLEvents, event: "land_collision_end", callback: (Position: vector) -> ()) -> boolean)
-    & ((self: LLEvents, event: "land_collision_start", callback: (Position: vector) -> ()) -> boolean)
-    & ((self: LLEvents, event: "link_message", callback: (SendersLink: number, Value: number, Text: string, ID: string) -> ()) -> boolean)
-    & ((self: LLEvents, event: "linkset_data", callback: (action: number, name: string, value: string) -> ()) -> boolean)
-    & ((self: LLEvents, event: "listen", callback: (Channel: number, Name: string, ID: uuid, Text: string) -> ()) -> boolean)
-    & ((self: LLEvents, event: "money", callback: (Payer: uuid, Amount: number) -> ()) -> boolean)
-    & ((self: LLEvents, event: "moving_end", callback: () -> ()) -> boolean)
-    & ((self: LLEvents, event: "moving_start", callback: () -> ()) -> boolean)
-    & ((self: LLEvents, event: "no_sensor", callback: () -> ()) -> boolean)
-    & ((self: LLEvents, event: "not_at_rot_target", callback: () -> ()) -> boolean)
-    & ((self: LLEvents, event: "not_at_target", callback: () -> ()) -> boolean)
-    & ((self: LLEvents, event: "object_rez", callback: (RezzedObjectsID: uuid) -> ()) -> boolean)
-    & ((self: LLEvents, event: "on_death", callback: () -> ()) -> boolean)
-    & ((self: LLEvents, event: "on_rez", callback: (StartParameter: number) -> ()) -> boolean)
-    & ((self: LLEvents, event: "path_update", callback: (Type: number, Reserved: list) -> ()) -> boolean)
-    & ((self: LLEvents, event: "remote_data", callback: (EventType: number, ChannelID: uuid, MessageID: uuid, Sender: string, IData: number, SData: string) -> ()) -> boolean)
-    & ((self: LLEvents, event: "run_time_permissions", callback: (PermissionFlags: number) -> ()) -> boolean)
-    & ((self: LLEvents, event: "timer", callback: () -> ()) -> boolean)
-    & ((self: LLEvents, event: "transaction_result", callback: (RequestID: uuid, Success: number, Message: string) -> ()) -> boolean)
+    & ((self: LLEvents, event: LLNonDetectedEventName, callback: LLEventHandler) -> boolean)
   once: ((self: LLEvents, event: LLDetectedEventName, callback: LLDetectedEventHandler) -> LLDetectedEventHandler)
-    & ((self: LLEvents, event: "at_rot_target", callback: (TargetNumber: number, TargetRotation: quaternion, CurrentRotation: quaternion) -> ()) -> (TargetNumber: number, TargetRotation: quaternion, CurrentRotation: quaternion) -> ())
-    & ((self: LLEvents, event: "at_target", callback: (TargetNumber: number, TargetPosition: vector, CurrentPosition: vector) -> ()) -> (TargetNumber: number, TargetPosition: vector, CurrentPosition: vector) -> ())
-    & ((self: LLEvents, event: "attach", callback: (AvatarID: uuid) -> ()) -> (AvatarID: uuid) -> ())
-    & ((self: LLEvents, event: "changed", callback: (Changed: number) -> ()) -> (Changed: number) -> ())
-    & ((self: LLEvents, event: "control", callback: (AvatarID: uuid, Levels: number, Edges: number) -> ()) -> (AvatarID: uuid, Levels: number, Edges: number) -> ())
-    & ((self: LLEvents, event: "dataserver", callback: (RequestID: uuid, Data: string) -> ()) -> (RequestID: uuid, Data: string) -> ())
-    & ((self: LLEvents, event: "email", callback: (Time: string, Address: string, Subject: string, Body: string, NumberRemaining: number) -> ()) -> (Time: string, Address: string, Subject: string, Body: string, NumberRemaining: number) -> ())
-    & ((self: LLEvents, event: "experience_permissions", callback: (agent_id: uuid) -> ()) -> (agent_id: uuid) -> ())
-    & ((self: LLEvents, event: "experience_permissions_denied", callback: (agent_id: uuid, Reason: number) -> ()) -> (agent_id: uuid, Reason: number) -> ())
-    & ((self: LLEvents, event: "game_control", callback: (id: uuid, buttons: number, axes: list) -> ()) -> (id: uuid, buttons: number, axes: list) -> ())
-    & ((self: LLEvents, event: "http_request", callback: (HTTPRequestID: uuid, HTTPMethod: string, Body: string) -> ()) -> (HTTPRequestID: uuid, HTTPMethod: string, Body: string) -> ())
-    & ((self: LLEvents, event: "http_response", callback: (HTTPRequestID: uuid, Status: number, Metadata: list, Body: string) -> ()) -> (HTTPRequestID: uuid, Status: number, Metadata: list, Body: string) -> ())
-    & ((self: LLEvents, event: "land_collision", callback: (Position: vector) -> ()) -> (Position: vector) -> ())
-    & ((self: LLEvents, event: "land_collision_end", callback: (Position: vector) -> ()) -> (Position: vector) -> ())
-    & ((self: LLEvents, event: "land_collision_start", callback: (Position: vector) -> ()) -> (Position: vector) -> ())
-    & ((self: LLEvents, event: "link_message", callback: (SendersLink: number, Value: number, Text: string, ID: string) -> ()) -> (SendersLink: number, Value: number, Text: string, ID: string) -> ())
-    & ((self: LLEvents, event: "linkset_data", callback: (action: number, name: string, value: string) -> ()) -> (action: number, name: string, value: string) -> ())
-    & ((self: LLEvents, event: "listen", callback: (Channel: number, Name: string, ID: uuid, Text: string) -> ()) -> (Channel: number, Name: string, ID: uuid, Text: string) -> ())
-    & ((self: LLEvents, event: "money", callback: (Payer: uuid, Amount: number) -> ()) -> (Payer: uuid, Amount: number) -> ())
-    & ((self: LLEvents, event: "moving_end", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "moving_start", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "no_sensor", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "not_at_rot_target", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "not_at_target", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "object_rez", callback: (RezzedObjectsID: uuid) -> ()) -> (RezzedObjectsID: uuid) -> ())
-    & ((self: LLEvents, event: "on_death", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "on_rez", callback: (StartParameter: number) -> ()) -> (StartParameter: number) -> ())
-    & ((self: LLEvents, event: "path_update", callback: (Type: number, Reserved: list) -> ()) -> (Type: number, Reserved: list) -> ())
-    & ((self: LLEvents, event: "remote_data", callback: (EventType: number, ChannelID: uuid, MessageID: uuid, Sender: string, IData: number, SData: string) -> ()) -> (EventType: number, ChannelID: uuid, MessageID: uuid, Sender: string, IData: number, SData: string) -> ())
-    & ((self: LLEvents, event: "run_time_permissions", callback: (PermissionFlags: number) -> ()) -> (PermissionFlags: number) -> ())
-    & ((self: LLEvents, event: "timer", callback: () -> ()) -> () -> ())
-    & ((self: LLEvents, event: "transaction_result", callback: (RequestID: uuid, Success: number, Message: string) -> ()) -> (RequestID: uuid, Success: number, Message: string) -> ())
-  function listeners(self, event: LLEventName): {LLEventHandler}
+    & ((self: LLEvents, event: LLNonDetectedEventName, callback: LLEventHandler) -> LLEventHandler)
+  function handlers(self, event: LLEventName): {LLEventHandler}
   function eventNames(self): {string}
 end
 
@@ -239,10 +162,10 @@ end
 
 
 declare function dangerouslyexecuterequiredmodule(f: (...any) -> ...any): ...any
-declare function touuid(val: string | buffer | uuid): uuid?
-declare function tovector(val: string | vector): vector?
-declare function toquaternion(val: string | quaternion): quaternion?
-declare function torotation(val: string | quaternion): quaternion?
+declare function touuid(val: string? | buffer | uuid): uuid?
+declare function tovector(val: string? | vector): vector?
+declare function toquaternion(val: string? | quaternion): quaternion?
+declare function torotation(val: string? | quaternion): quaternion?
 
 ---------------------------
 -- Global Table: bit32
@@ -261,6 +184,8 @@ declare bit32: {
   replace: (n: number, v: number, field: number, width: number?) -> number,
   rrotate: (n: number, i: number) -> number,
   rshift: (n: number, i: number) -> number,
+  s32: (n: number) -> number,
+  smul: (a: number, b: number) -> number,
   countlz: (n: number) -> number,
   countrz: (n: number) -> number,
   byteswap: (n: number) -> number,
@@ -347,15 +272,15 @@ declare llbase64: {
 
 declare lljson: {
   null: any,
-  empty_array_mt: { [any]: any },
-  array_mt: { [any]: any },
-  empty_array: any,
-  _NAME: string,
-  _VERSION: string,
-  encode: (value: any) -> string,
-  decode: (json: string) -> any,
-  slencode: (value: any, tight: boolean?) -> string,
-  sldecode: (json: string) -> any,
+  remove: any,
+  array_mt: {__jsonhint: string},
+  object_mt: {__jsonhint: string},
+  empty_array: {},
+  empty_object: {},
+  encode: (value: any, options: LLJsonEncodeOptions?) -> string,
+  decode: (json: string, options: LLJsonDecodeOptions?) -> any,
+  slencode: (value: any, options: LLJsonEncodeOptions?) -> string,
+  sldecode: (json: string, options: LLJsonDecodeOptions?) -> any,
 }
 
 
@@ -413,7 +338,7 @@ declare math: {
 declare os: {
   clock: () -> number,
   date: (s: string?, t: number?) -> (string | OsDateTime)?,
-  difftime: @deprecated (a: number, b: number?) -> number,
+  difftime: @[deprecated {reason='Same as a - b'}](a: number, b: number?) -> number,
   time: (t: OsDateTime?) -> number?,
 }
 
@@ -467,12 +392,14 @@ declare string: {
 
 declare table: {
   concat: (a: {string | number}, sep: string?, i: number?, j: number?) -> string,
-  foreach: @deprecated <K, V, R>(t: {[K]: V}, f: (key: K, value: V) -> R?) -> R?,
-  foreachi: @deprecated <V, R>(a: {V}, f: (index: number, value: V) -> R?) -> R?,
-  getn: @deprecated (a: {any}) -> number,
+  foreach: @[deprecated {reason='Use a for loop instead'}]<K, V, R>(t: {[K]: V}, f: (key: K, value: V) -> R?) -> R?,
+  foreachi: @[deprecated {reason='Use a for loop instead'}]<V, R>(a: {V}, f: (index: number, value: V) -> R?) -> R?,
+  getn: @[deprecated {use='#'}](a: {any}) -> number,
   maxn: (t: {any}) -> number,
   insert: (<V>(a: {V}, i: number, v: V) -> ())
     & (<V>(a: {V}, value: V) -> ()),
+  append: <V>(a: {V}, ...V) -> (),
+  extend: <V>(a: {V}, b: {V}) -> {V},
   remove: <V>(a: {V}, i: number?) -> V?,
   sort: <V>(a: {V}, f: ((a: V, b: V) -> boolean)?) -> (),
   pack: <V>(...V) -> { n: number, [number]: V },
@@ -480,11 +407,11 @@ declare table: {
   move: <V>(src: {V}, i: number, j: number, d: number, dest: {V}?) -> {V},
   create: <V>(n: number, v: V?) -> {V},
   find: <V>(t: {V}, v: V, i: number?) -> number?,
-  clear: (t: {[any]: any}) -> (),
-  shrink: <K, V>(t: {[K]: V}, reorder: boolean?) -> {[K]: V},
-  freeze: <K, V>(t: {[K]: V}) -> {[K]: V},
-  isfrozen: (t: {[any]: any}) -> boolean,
-  clone: <K, V>(t: {[K]: V}) -> {[K]: V},
+  clear: (t: {}) -> (),
+  shrink: <V>(t: {V}, reorder: boolean?) -> {V},
+  freeze: <table>(t: table) -> table,
+  isfrozen: (t: {}) -> boolean,
+  clone: <table>(t: table) -> table,
 }
 
 
@@ -506,8 +433,8 @@ declare utf8: {
 -- Global Table: uuid
 ---------------------------
 
-declare uuid: ((value: string | buffer | uuid) -> uuid?) & {
-  create: (value: string | buffer | uuid) -> uuid?,
+declare uuid: ((value: string? | buffer | uuid) -> uuid) & {
+  create: (value: string? | buffer | uuid) -> uuid,
 }
 
 
@@ -546,32 +473,32 @@ declare setfenv: nil
 ---------------------------
 
 declare ll: {
-  Abs: (Value: number) -> number,
-  Acos: (Value: number) -> number,
+  Abs: @[deprecated {use='math.abs', reason='Double precision; fastcall.'}](Value: number) -> number,
+  Acos: @[deprecated {use='math.acos', reason='Double precision; fastcall.'}](Value: number) -> number,
   AddToLandBanList: (ID: uuid, Hours: number) -> (),
   AddToLandPassList: (ID: uuid, Hours: number) -> (),
-  AdjustDamage: @deprecated (Number: number, Damage: number) -> (),
+  AdjustDamage: @[deprecated {use='adjustDamage'}](Number: number, Damage: number) -> (),
   AdjustSoundVolume: (Volume: number) -> (),
   AgentInExperience: (AgentID: uuid) -> boolean,
   AllowInventoryDrop: (Flag: boolean | number) -> (),
   AngleBetween: (Rot1: quaternion, Rot2: quaternion) -> number,
   ApplyImpulse: (Force: vector, Local: boolean | number) -> (),
   ApplyRotationalImpulse: (Force: vector, Local: boolean | number) -> (),
-  Asin: (Value: number) -> number,
-  Atan2: (y: number, x: number) -> number,
+  Asin: @[deprecated {use='math.asin', reason='Double precision; fastcall.'}](Value: number) -> number,
+  Atan2: @[deprecated {use='math.atan2', reason='Double precision; fastcall.'}](y: number, x: number) -> number,
   AttachToAvatar: (AttachmentPoint: number) -> (),
   AttachToAvatarTemp: (AttachPoint: number) -> (),
   AvatarOnLinkSitTarget: (LinkNumber: number) -> uuid,
   AvatarOnSitTarget: () -> uuid,
   Axes2Rot: (Forward: vector, Left: vector, Up: vector) -> quaternion,
   AxisAngle2Rot: (Axis: vector, Angle: number) -> quaternion,
-  Base64ToInteger: (Text: string) -> number,
-  Base64ToString: (Text: string) -> string,
+  Base64ToInteger: @[deprecated {reason="Use 'llbase64.decode' and 'string.unpack' or 'buffer.readi32' instead."}](Text: string) -> number,
+  Base64ToString: @[deprecated {use='llbase64.decode'}](Text: string) -> string,
   BreakAllLinks: () -> (),
   BreakLink: (LinkNumber: number) -> (),
   CSV2List: (Text: string) -> {string},
-  CastRay: (Start: vector, End: vector, Options: list) -> list,
-  Ceil: (Value: number) -> number,
+  CastRay: (Start: vector, End: vector, Options: list) -> {any},
+  Ceil: @[deprecated {use='math.ceil', reason='Double precision; fastcall.'}](Value: number) -> number,
   Char: (value: number) -> string,
   ClearCameraParams: () -> (),
   ClearLinkMedia: (Link: number, Face: number) -> number,
@@ -582,7 +509,7 @@ declare ll: {
   CollisionSound: (ImpactSound: string | uuid, ImpactVolume: number) -> (),
   CollisionSprite: @deprecated (ImpactSprite: string | uuid) -> (),
   ComputeHash: (Message: string, Algorithm: string) -> string,
-  Cos: (Theta: number) -> number,
+  Cos: @[deprecated {use='math.cos', reason='Double precision; fastcall.'}](Theta: number) -> number,
   CreateCharacter: (Options: list) -> (),
   CreateKeyValue: (Key: string, Value: string) -> uuid,
   CreateLink: (TargetPrim: uuid, Parent: boolean | number) -> (),
@@ -594,25 +521,25 @@ declare ll: {
   DeleteSubString: (Source: string, Start: number, End: number) -> string,
   DerezObject: (ID: uuid, flags: number) -> boolean,
   DetachFromAvatar: () -> (),
-  DetectedDamage: @deprecated (Number: number) -> list,
-  DetectedGrab: @deprecated (Number: number) -> vector,
-  DetectedGroup: @deprecated (Number: number) -> boolean,
-  DetectedKey: @deprecated (Number: number) -> uuid,
-  DetectedLinkNumber: @deprecated (Number: number) -> number,
-  DetectedName: @deprecated (Number: number) -> string,
-  DetectedOwner: @deprecated (Number: number) -> uuid,
-  DetectedPos: @deprecated (Number: number) -> vector,
-  DetectedRezzer: @deprecated (Number: number) -> uuid,
-  DetectedRot: @deprecated (Number: number) -> quaternion,
-  DetectedTouchBinormal: @deprecated (Index: number) -> vector,
-  DetectedTouchFace: @deprecated (Index: number) -> number,
-  DetectedTouchNormal: @deprecated (Index: number) -> vector,
-  DetectedTouchPos: @deprecated (Index: number) -> vector,
-  DetectedTouchST: @deprecated (Index: number) -> vector,
-  DetectedTouchUV: @deprecated (Index: number) -> vector,
-  DetectedType: @deprecated (Number: number) -> number,
-  DetectedVel: @deprecated (Number: number) -> vector,
-  Dialog: (AvatarID: uuid, Text: string, Buttons: list, Channel: number) -> (),
+  DetectedDamage: @[deprecated {use='getDamage'}](Number: number) -> {any},
+  DetectedGrab: @[deprecated {use='getGrab'}](Number: number) -> vector,
+  DetectedGroup: @[deprecated {use='getGroup'}](Number: number) -> boolean,
+  DetectedKey: @[deprecated {use='getKey'}](Number: number) -> uuid,
+  DetectedLinkNumber: @[deprecated {use='getLinkNumber'}](Number: number) -> number,
+  DetectedName: @[deprecated {use='getName'}](Number: number) -> string,
+  DetectedOwner: @[deprecated {use='getOwner'}](Number: number) -> uuid,
+  DetectedPos: @[deprecated {use='getPos'}](Number: number) -> vector,
+  DetectedRezzer: @[deprecated {use='getRezzer'}](Number: number) -> uuid,
+  DetectedRot: @[deprecated {use='getRot'}](Number: number) -> quaternion,
+  DetectedTouchBinormal: @[deprecated {use='getTouchBinormal'}](Index: number) -> vector,
+  DetectedTouchFace: @[deprecated {use='getTouchFace'}](Index: number) -> number,
+  DetectedTouchNormal: @[deprecated {use='getTouchNormal'}](Index: number) -> vector,
+  DetectedTouchPos: @[deprecated {use='getTouchPos'}](Index: number) -> vector,
+  DetectedTouchST: @[deprecated {use='getTouchST'}](Index: number) -> vector,
+  DetectedTouchUV: @[deprecated {use='getTouchUV'}](Index: number) -> vector,
+  DetectedType: @[deprecated {use='getType'}](Number: number) -> number,
+  DetectedVel: @[deprecated {use='getVel'}](Number: number) -> vector,
+  Dialog: (AvatarID: uuid, Text: string, Buttons: {string}, Channel: number) -> (),
   Die: () -> (),
   DumpList2String: (Source: list, Separator: string) -> string,
   EdgeOfWorld: (Position: vector, Direction: vector) -> boolean,
@@ -622,18 +549,18 @@ declare ll: {
   Euler2Rot: (Vector: vector) -> quaternion,
   Evade: (TargetID: uuid, Options: list) -> (),
   ExecCharacterCmd: (Command: number, Options: list) -> (),
-  Fabs: (Value: number) -> number,
+  Fabs: @[deprecated {use='math.abs', reason='Double precision; fastcall.'}](Value: number) -> number,
   FindNotecardTextCount: (NotecardName: string | uuid, Pattern: string, Options: list) -> uuid,
-  FindNotecardTextSync: (NotecardName: string | uuid, Pattern: string, StartMatch: number, Count: number, Options: list) -> list,
+  FindNotecardTextSync: (NotecardName: string | uuid, Pattern: string, StartMatch: number, Count: number, Options: list) -> {any},
   FleeFrom: (Source: vector, Distance: number, Options: list) -> (),
-  Floor: (Value: number) -> number,
+  Floor: @[deprecated {use='math.floor', reason='Double precision; fastcall.'}](Value: number) -> number,
   ForceMouselook: (Enable: boolean | number) -> (),
   Frand: (Magnitude: number) -> number,
   GenerateKey: () -> uuid,
   GetAccel: () -> vector,
   GetAgentInfo: (AvatarID: uuid) -> number,
   GetAgentLanguage: (AvatarID: uuid) -> string,
-  GetAgentList: (Scope: number, Options: list) -> list,
+  GetAgentList: (Scope: number, Options: list) -> {uuid},
   GetAgentSize: (AvatarID: uuid) -> vector,
   GetAlpha: (Face: number) -> number,
   GetAnimation: (AvatarID: uuid) -> string,
@@ -648,7 +575,7 @@ declare ll: {
   GetCameraPos: () -> vector,
   GetCameraRot: () -> quaternion,
   GetCenterOfMass: () -> vector,
-  GetClosestNavPoint: (Point: vector, Options: list) -> list,
+  GetClosestNavPoint: (Point: vector, Options: list) -> {vector},
   GetColor: (Face: number) -> vector,
   GetCreator: () -> uuid,
   GetDate: () -> string,
@@ -657,8 +584,8 @@ declare ll: {
   GetDisplayName: (AvatarID: uuid) -> string,
   GetEnergy: () -> number,
   GetEnv: (DataRequest: string) -> string,
-  GetEnvironment: (Position: vector, EnvParams: list) -> list,
-  GetExperienceDetails: (ExperienceID: uuid) -> list,
+  GetEnvironment: (Position: vector, EnvParams: {number}) -> {any},
+  GetExperienceDetails: (ExperienceID: uuid) -> {any},
   GetExperienceErrorMessage: (Error: number) -> string,
   GetForce: () -> vector,
   GetFreeMemory: () -> number,
@@ -678,14 +605,14 @@ declare ll: {
   GetKey: () -> uuid,
   GetLandOwnerAt: (Position: vector) -> uuid,
   GetLinkKey: (LinkNumber: number) -> uuid,
-  GetLinkMedia: (LinkNumber: number, Face: number, Parameters: list) -> list,
+  GetLinkMedia: (LinkNumber: number, Face: number, Parameters: {number}) -> {any},
   GetLinkName: (LinkNumber: number) -> string,
   GetLinkNumber: () -> number,
   GetLinkNumberOfSides: (LinkNumber: number) -> number,
-  GetLinkPrimitiveParams: (LinkNumber: number, Parameters: list) -> list,
+  GetLinkPrimitiveParams: (LinkNumber: number, Parameters: {number}) -> {any},
   GetLinkSitFlags: (LinkNumber: number) -> number,
-  GetListEntryType: (ListVariable: list, Index: number) -> number,
-  GetListLength: (ListVariable: list) -> number,
+  GetListEntryType: @[deprecated {use='typeof'}](ListVariable: list, Index: number) -> number,
+  GetListLength: @[deprecated {reason="Use '#' or 'rawlen' instead. Metatable support."}](ListVariable: list) -> number,
   GetLocalPos: () -> vector,
   GetLocalRot: () -> quaternion,
   GetMass: () -> number,
@@ -703,7 +630,7 @@ declare ll: {
   GetNumberOfSides: () -> number,
   GetObjectAnimationNames: () -> {string},
   GetObjectDesc: () -> string,
-  GetObjectDetails: (ID: uuid, Parameters: list) -> list,
+  GetObjectDetails: (ID: uuid, Parameters: {number}) -> {any},
   GetObjectLinkKey: (id: uuid, link_no: number) -> uuid,
   GetObjectMass: (ID: uuid) -> number,
   GetObjectName: () -> string,
@@ -712,18 +639,18 @@ declare ll: {
   GetOmega: () -> vector,
   GetOwner: () -> uuid,
   GetOwnerKey: (ObjectID: uuid) -> uuid,
-  GetParcelDetails: (Position: vector, ParcelDetails: list) -> list,
+  GetParcelDetails: (Position: vector, ParcelDetails: {number}) -> {any},
   GetParcelFlags: (Position: vector) -> number,
   GetParcelMaxPrims: (Position: vector, SimWide: boolean | number) -> number,
   GetParcelMusicURL: () -> string,
   GetParcelPrimCount: (Position: vector, Category: number, SimWide: boolean | number) -> number,
-  GetParcelPrimOwners: (Position: vector) -> list,
+  GetParcelPrimOwners: (Position: vector) -> {any},
   GetPermissions: () -> number,
   GetPermissionsKey: () -> uuid,
-  GetPhysicsMaterial: () -> list,
+  GetPhysicsMaterial: () -> {number},
   GetPos: () -> vector,
-  GetPrimMediaParams: (Face: number, Parameters: list) -> list,
-  GetPrimitiveParams: (Parameters: list) -> list,
+  GetPrimMediaParams: (Face: number, Parameters: {number}) -> {any},
+  GetPrimitiveParams: (Parameters: {number}) -> {any},
   GetRegionAgentCount: () -> number,
   GetRegionCorner: () -> vector,
   GetRegionDayLength: () -> number,
@@ -749,7 +676,7 @@ declare ll: {
   GetSimulatorHostname: () -> string,
   GetStartParameter: () -> number,
   GetStartString: () -> string,
-  GetStaticPath: (Start: vector, End: vector, Radius: number, Parameters: list) -> list,
+  GetStaticPath: (Start: vector, End: vector, Radius: number, Parameters: list) -> {any},
   GetStatus: (StatusFlag: number) -> boolean,
   GetSubString: (String: string, Start: number, End: number) -> string,
   GetSunDirection: () -> vector,
@@ -766,11 +693,11 @@ declare ll: {
   GetUsedMemory: () -> number,
   GetUsername: (AvatarID: uuid) -> string,
   GetVel: () -> vector,
-  GetVisualParams: (ID: uuid, Parameters: list) -> list,
+  GetVisualParams: (ID: uuid, Parameters: {number | string}) -> {number | ""},
   GetWallclock: () -> number,
-  GiveAgentInventory: (AgentID: uuid, FolderName: string, InventoryItems: list, Options: list) -> number,
+  GiveAgentInventory: (AgentID: uuid, FolderName: string, InventoryItems: {string}, Options: list) -> number,
   GiveInventory: (TargetID: uuid, InventoryItem: string) -> (),
-  GiveInventoryList: (TargetID: uuid, FolderName: string, InventoryItems: list) -> (),
+  GiveInventoryList: (TargetID: uuid, FolderName: string, InventoryItems: {string}) -> (),
   GiveMoney: (AvatarID: uuid, Amount: number) -> number,
   GodLikeRezObject: (InventoryItemID: uuid, Position: vector) -> (),
   Ground: (Offset: vector) -> number,
@@ -787,10 +714,10 @@ declare ll: {
   IntegerToBase64: (Value: number) -> string,
   IsFriend: (agent_id: uuid) -> boolean,
   IsLinkGLTFMaterial: (link: number, face: number) -> boolean,
-  Json2List: (JSON: string) -> list,
-  JsonGetValue: (JSON: string, Specifiers: list) -> string,
-  JsonSetValue: (JSON: string, Specifiers: list, Value: string) -> string,
-  JsonValueType: (JSON: string, Specifiers: list) -> string,
+  Json2List: @[deprecated {use='lljson.decode'}](JSON: string) -> {any},
+  JsonGetValue: @[deprecated {use='lljson.decode', reason='Also, the indices are zero-based.'}](JSON: string, Specifiers: list) -> string,
+  JsonSetValue: @[deprecated {use='lljson.encode', reason='Also, the indices are zero-based.'}](JSON: string, Specifiers: list, Value: string) -> string,
+  JsonValueType: @[deprecated {reason="Use 'lljson.decode' and 'typeof' instead. Also, the indices are zero-based."}](JSON: string, Specifiers: list) -> string,
   Key2Name: (ID: uuid) -> string,
   KeyCountKeyValue: () -> uuid,
   KeysKeyValue: (First: number, Count: number) -> uuid,
@@ -806,29 +733,29 @@ declare ll: {
   LinksetDataCountFound: (search: string) -> number,
   LinksetDataCountKeys: () -> number,
   LinksetDataDelete: (name: string) -> number,
-  LinksetDataDeleteFound: (search: string, pass: string) -> list,
+  LinksetDataDeleteFound: (search: string, pass: string) -> {number},
   LinksetDataDeleteProtected: (name: string, pass: string) -> number,
-  LinksetDataFindKeys: (search: string, start: number, count: number) -> list,
-  LinksetDataListKeys: (start: number, count: number) -> list,
+  LinksetDataFindKeys: (search: string, start: number, count: number) -> {string},
+  LinksetDataListKeys: (start: number, count: number) -> {string},
   LinksetDataRead: (name: string) -> string,
   LinksetDataReadProtected: (name: string, pass: string) -> string,
   LinksetDataReset: () -> (),
   LinksetDataWrite: (name: string, value: string) -> number,
   LinksetDataWriteProtected: (name: string, value: string, pass: string) -> number,
   List2CSV: (ListVariable: list) -> string,
-  List2Float: (ListVariable: list, Index: number) -> number,
-  List2Integer: (ListVariable: list, Index: number) -> number,
-  List2Json: (JsonType: string, Values: list) -> string,
-  List2Key: (ListVariable: list, Index: number) -> uuid,
+  List2Float: @[deprecated {reason="Use '[]' and 'tonumber' instead."}](ListVariable: list, Index: number) -> number,
+  List2Integer: @[deprecated {reason="Use '[]', 'tonumber', and 'math.modf' instead."}](ListVariable: list, Index: number) -> number,
+  List2Json: @[deprecated {use='lljson.encode'}](JsonType: string, Values: list) -> string,
+  List2Key: @[deprecated {reason="Use '[]' and 'touuid' instead."}](ListVariable: list, Index: number) -> uuid,
   List2List: <T>(ListVariable: {T}, Start: number, End: number) -> {T},
   List2ListSlice: <T>(ListVariable: {T}, Start: number, End: number, Stride: number, slice_index: number) -> {T},
   List2ListStrided: <T>(ListVariable: {T}, Start: number, End: number, Stride: number) -> {T},
-  List2Rot: (ListVariable: list, Index: number) -> quaternion,
-  List2String: (ListVariable: list, Index: number) -> string,
-  List2Vector: (ListVariable: list, Index: number) -> vector,
-  ListFindList: (ListVariable: list, Find: list) -> number,
-  ListFindListNext: (ListVariable: list, Find: list, Instance: number) -> number,
-  ListFindStrided: (ListVariable: list, Find: list, Start: number, End: number, Stride: number) -> number,
+  List2Rot: @[deprecated {use='[]'}](ListVariable: list, Index: number) -> quaternion,
+  List2String: @[deprecated {reason="Use '[]' and 'tostring' instead."}](ListVariable: list, Index: number) -> string,
+  List2Vector: @[deprecated {use='[]'}](ListVariable: list, Index: number) -> vector,
+  ListFindList: (ListVariable: list, Find: list) -> number?,
+  ListFindListNext: (ListVariable: list, Find: list, Instance: number) -> number?,
+  ListFindStrided: (ListVariable: list, Find: list, Start: number, End: number, Stride: number) -> number?,
   ListInsertList: <T>(Target: {T}, ListVariable: {T}, Position: number) -> {T},
   ListRandomize: <T>(ListVariable: {T}, Stride: number) -> {T},
   ListReplaceList: <T>(Target: {T}, ListVariable: {T}, Start: number, End: number) -> {T},
@@ -839,17 +766,17 @@ declare ll: {
   ListenControl: (ChannelHandle: number, Active: boolean | number) -> (),
   ListenRemove: (ChannelHandle: number) -> (),
   LoadURL: (AvatarID: uuid, Text: string, URL: string) -> (),
-  Log: (Value: number) -> number,
-  Log10: (Value: number) -> number,
+  Log: @[deprecated {use='math.log', reason="It's a fastcall."}](Value: number) -> number,
+  Log10: @[deprecated {use='math.log10', reason="It's a fastcall."}](Value: number) -> number,
   LookAt: (Target: vector, Strength: number, Damping: number) -> (),
   LoopSound: (Sound: string | uuid, Volume: number) -> (),
   LoopSoundMaster: (Sound: string | uuid, Volume: number) -> (),
   LoopSoundSlave: (Sound: string | uuid, Volume: number) -> (),
   MD5String: (Text: string, Nonce: number) -> string,
-  MakeExplosion: @deprecated (Particles: number, Scale: number, Velocity: number, Lifetime: number, Arc: number, Texture: string | uuid, Offset: vector) -> (),
-  MakeFire: @deprecated (Particles: number, Scale: number, Velocity: number, Lifetime: number, Arc: number, Texture: string | uuid, Offset: vector) -> (),
-  MakeFountain: @deprecated (Particles: number, Scale: number, Velocity: number, Lifetime: number, Arc: number, Bounce: number, Texture: string | uuid, Offset: vector, Bounce_Offset: number) -> (),
-  MakeSmoke: @deprecated (Particles: number, Scale: number, Velocity: number, Lifetime: number, Arc: number, Texture: string | uuid, Offset: vector) -> (),
+  MakeExplosion: @[deprecated {use='ll.ParticleSystem'}](Particles: number, Scale: number, Velocity: number, Lifetime: number, Arc: number, Texture: string | uuid, Offset: vector) -> (),
+  MakeFire: @[deprecated {use='ll.ParticleSystem'}](Particles: number, Scale: number, Velocity: number, Lifetime: number, Arc: number, Texture: string | uuid, Offset: vector) -> (),
+  MakeFountain: @[deprecated {use='ll.ParticleSystem'}](Particles: number, Scale: number, Velocity: number, Lifetime: number, Arc: number, Bounce: number, Texture: string | uuid, Offset: vector, Bounce_Offset: number) -> (),
+  MakeSmoke: @[deprecated {use='ll.ParticleSystem'}](Particles: number, Scale: number, Velocity: number, Lifetime: number, Arc: number, Texture: string | uuid, Offset: vector) -> (),
   ManageEstateAccess: (Action: number, AvatarID: uuid) -> boolean,
   MapBeacon: (RegionName: string, Position: vector, Options: list) -> (),
   MapDestination: (RegionName: string, Position: vector, Direction: vector) -> (),
@@ -865,26 +792,26 @@ declare ll: {
   OpenRemoteDataChannel: @deprecated () -> (),
   Ord: (value: string, index: number) -> number,
   OverMyLand: (ID: uuid) -> boolean,
-  OwnerSay: (Text: string) -> (),
+  OwnerSay: @[deprecated {use='print'}](Text: string) -> (),
   ParcelMediaCommandList: (CommandList: list) -> (),
-  ParcelMediaQuery: (QueryList: list) -> list,
+  ParcelMediaQuery: (QueryList: {number}) -> {any},
   ParseString2List: (Text: string, Separators: {string}, Spacers: {string}) -> {string},
   ParseStringKeepNulls: (Text: string, Separators: {string}, Spacers: {string}) -> {string},
   ParticleSystem: (Parameters: list) -> (),
   PassCollisions: (Pass: boolean | number) -> (),
   PassTouches: (Pass: boolean | number) -> (),
-  PatrolPoints: (Points: list, Options: list) -> (),
+  PatrolPoints: (Points: {vector}, Options: list) -> (),
   PlaySound: (Sound: string | uuid, Volume: number) -> (),
   PlaySoundSlave: (Sound: string | uuid, Volume: number) -> (),
-  Pow: (Value: number, Exponent: number) -> number,
+  Pow: @[deprecated {use='^', reason="It's a fastcall."}](Value: number, Exponent: number) -> number,
   PreloadSound: (Sound: string | uuid) -> (),
   Pursue: (TargetID: uuid, Options: list) -> (),
   PushObject: (ObjectID: uuid, Impulse: vector, AngularImpulse: vector, Local: boolean | number) -> (),
   ReadKeyValue: (Key: string) -> uuid,
-  RefreshPrimURL: @deprecated () -> (),
+  RefreshPrimURL: @[deprecated {use='ll.SetPrimMediaParams'}]() -> (),
   RegionSay: (Channel: number, Text: string) -> (),
   RegionSayTo: (TargetID: uuid, Channel: number, Text: string) -> (),
-  ReleaseCamera: @deprecated (AvatarID: uuid) -> (),
+  ReleaseCamera: @[deprecated {use='ll.ClearCameraParams'}](AvatarID: uuid) -> (),
   ReleaseControls: () -> (),
   ReleaseURL: (URL: string) -> (),
   RemoteDataReply: @deprecated (ChannelID: uuid, MessageID: uuid, sData: string, iData: number) -> (),
@@ -894,8 +821,8 @@ declare ll: {
   RemoveFromLandPassList: (AvatarID: uuid) -> (),
   RemoveInventory: (InventoryItem: string) -> (),
   RemoveVehicleFlags: (Vehiclelags: number) -> (),
-  ReplaceAgentEnvironment: (agent_id: uuid, transition: number, environment: string) -> number,
-  ReplaceEnvironment: (position: vector, environment: string, track_no: number, day_length: number, day_offset: number) -> number,
+  ReplaceAgentEnvironment: (agent_id: uuid, transition: number, environment: string | uuid) -> number,
+  ReplaceEnvironment: (position: vector, environment: string | uuid, track_no: number, day_length: number, day_offset: number) -> number,
   ReplaceSubString: (InitialString: string, SubString: string, NewSubString: string, Count: number) -> string,
   RequestAgentData: (AvatarID: uuid, Data: number) -> uuid,
   RequestDisplayName: (AvatarID: uuid) -> uuid,
@@ -912,7 +839,7 @@ declare ll: {
   ResetLandPassList: () -> (),
   ResetOtherScript: (ScriptName: string) -> (),
   ResetScript: () -> (),
-  ReturnObjectsByID: (ObjectIDs: list) -> number,
+  ReturnObjectsByID: (ObjectIDs: {uuid}) -> number,
   ReturnObjectsByOwner: (ID: uuid, Scope: number) -> number,
   RezAtRoot: (InventoryItem: string, Position: vector, Velocity: vector, Rotation: quaternion, StartParameter: number) -> (),
   RezObject: (InventoryItem: string, Position: vector, Velocity: vector, Rotation: quaternion, StartParameter: number) -> (),
@@ -928,7 +855,7 @@ declare ll: {
   RotTarget: (Rotation: quaternion, LeeWay: number) -> number,
   RotTargetRemove: (Handle: number) -> (),
   RotateTexture: (Radians: number, Face: number) -> (),
-  Round: (Value: number) -> number,
+  Round: @[deprecated {use='math.round', reason="It's a fastcall."}](Value: number) -> number,
   SHA1String: (Text: string) -> string,
   SHA256String: (text: string) -> string,
   SameGroup: (ID: uuid) -> boolean,
@@ -966,7 +893,7 @@ declare ll: {
   SetLinkColor: (LinkNumber: number, Color: vector, Face: number) -> (),
   SetLinkGLTFOverrides: (link: number, face: number, options: list) -> (),
   SetLinkMedia: (Link: number, Face: number, Parameters: list) -> number,
-  SetLinkPrimitiveParams: @deprecated (LinkNumber: number, Parameters: list) -> (),
+  SetLinkPrimitiveParams: @[deprecated {use='ll.SetLinkPrimitiveParamsFast'}](LinkNumber: number, Parameters: list) -> (),
   SetLinkPrimitiveParamsFast: (LinkNumber: number, Parameters: list) -> (),
   SetLinkRenderMaterial: (LinkNumber: number, RenderMaterial: string | uuid, Face: number) -> (),
   SetLinkSitFlags: (LinkNumber: number, Flags: number) -> (),
@@ -978,12 +905,12 @@ declare ll: {
   SetObjectPermMask: (PermissionFlag: number, PermissionMask: number) -> (),
   SetParcelForSale: (ForSale: boolean | number, Options: list) -> number,
   SetParcelMusicURL: (URL: string) -> (),
-  SetPayPrice: (Price: number, QuickButtons: list) -> (),
+  SetPayPrice: (Price: number, QuickButtons: {number}) -> (),
   SetPhysicsMaterial: (MaterialBits: number, GravityMultiplier: number, Restitution: number, Friction: number, Density: number) -> (),
   SetPos: (Position: vector) -> (),
   SetPrimMediaParams: (Face: number, MediaParameters: list) -> number,
-  SetPrimURL: @deprecated (URL: string) -> (),
-  SetPrimitiveParams: @deprecated (Parameters: list) -> (),
+  SetPrimURL: @[deprecated {use='ll.SetPrimMediaParams'}](URL: string) -> (),
+  SetPrimitiveParams: @[deprecated {use='ll.SetLinkPrimitiveParamsFast'}](Parameters: list) -> (),
   SetRegionPos: (Position: vector) -> boolean,
   SetRemoteScriptAccessPin: (PIN: number) -> (),
   SetRenderMaterial: (Material: string | uuid, Face: number) -> (),
@@ -1004,16 +931,16 @@ declare ll: {
   SetVehicleRotationParam: (ParameterName: number, ParameterValue: quaternion) -> (),
   SetVehicleType: (Type: number) -> (),
   SetVehicleVectorParam: (ParameterName: number, ParameterValue: vector) -> (),
-  SetVelocity: (Velocity: vector, Local: number) -> (),
+  SetVelocity: (Velocity: vector, Local: boolean | number) -> (),
   Shout: (Channel: number, Text: string) -> (),
   SignRSA: (PrivateKey: string, Message: string, Algorithm: string) -> string,
-  Sin: (Theta: number) -> number,
+  Sin: @[deprecated {use='math.sin', reason="It's a fastcall."}](Theta: number) -> number,
   SitOnLink: (AvatarID: uuid, LinkID: number) -> number,
   SitTarget: (Offset: vector, Rotation: quaternion) -> (),
   Sleep: (Time: number) -> (),
-  Sound: @deprecated (Sound: string | uuid, Volume: number, Queue: boolean | number, Loop: boolean | number) -> (),
-  SoundPreload: @deprecated (Sound: string | uuid) -> (),
-  Sqrt: (Value: number) -> number,
+  Sound: @[deprecated {use='ll.PlaySound'}](Sound: string | uuid, Volume: number, Queue: boolean | number, Loop: boolean | number) -> (),
+  SoundPreload: @[deprecated {use='ll.PreloadSound'}](Sound: string | uuid) -> (),
+  Sqrt: @[deprecated {use='math.sqrt', reason="It's a fastcall."}](Value: number) -> number,
   StartAnimation: (Animation: string) -> (),
   StartObjectAnimation: (Animation: string) -> (),
   StopAnimation: (Animation: string | uuid) -> (),
@@ -1022,13 +949,13 @@ declare ll: {
   StopMoveToTarget: () -> (),
   StopObjectAnimation: (Animation: string | uuid) -> (),
   StopSound: () -> (),
-  StringLength: (Text: string) -> number,
-  StringToBase64: (Text: string) -> string,
+  StringLength: @[deprecated {reason="Use 'utf8.len' or '#' or 'string.len' instead."}](Text: string) -> number,
+  StringToBase64: @[deprecated {use='llbase64.encode'}](Text: string) -> string,
   StringTrim: (Text: string, TrimType: number) -> string,
-  SubStringIndex: (Text: string, Sequence: string) -> number,
-  TakeCamera: @deprecated (AvatarID: uuid) -> (),
+  SubStringIndex: (Text: string, Sequence: string) -> number?,
+  TakeCamera: @[deprecated {use='ll.SetCameraParams'}](AvatarID: uuid) -> (),
   TakeControls: (Controls: number, Accept: boolean | number, PassOn: boolean | number) -> (),
-  Tan: (Theta: number) -> number,
+  Tan: @[deprecated {use='math.tan', reason="It's a fastcall."}](Theta: number) -> number,
   Target: (Position: vector, Range: number) -> number,
   TargetOmega: (Axis: vector, SpinRate: number, Gain: number) -> (),
   TargetRemove: (Target: number) -> (),
@@ -1058,8 +985,8 @@ declare ll: {
   Wind: (Offset: vector) -> vector,
   WorldPosToHUD: (world_pos: vector) -> vector,
   XorBase64: (Text1: string, Text2: string) -> string,
-  XorBase64Strings: @deprecated (Text1: string, Text2: string) -> string,
-  XorBase64StringsCorrect: @deprecated (Text1: string, Text2: string) -> string,
+  XorBase64Strings: @[deprecated {use='ll.XorBase64'}](Text1: string, Text2: string) -> string,
+  XorBase64StringsCorrect: @[deprecated {use='ll.XorBase64'}](Text1: string, Text2: string) -> string,
   sRGB2Linear: (srgb: vector) -> vector,
 }
 
@@ -1093,7 +1020,7 @@ declare llcompat: {
   BreakAllLinks: @deprecated () -> (),
   BreakLink: @deprecated (LinkNumber: number) -> (),
   CSV2List: @deprecated (Text: string) -> {string},
-  CastRay: @deprecated (Start: vector, End: vector, Options: list) -> list,
+  CastRay: @deprecated (Start: vector, End: vector, Options: list) -> {any},
   Ceil: @deprecated (Value: number) -> number,
   Char: @deprecated (value: number) -> string,
   ClearCameraParams: @deprecated () -> (),
@@ -1117,7 +1044,7 @@ declare llcompat: {
   DeleteSubString: @deprecated (Source: string, Start: number, End: number) -> string,
   DerezObject: @deprecated (ID: uuid, flags: number) -> number,
   DetachFromAvatar: @deprecated () -> (),
-  DetectedDamage: @deprecated (Number: number) -> list,
+  DetectedDamage: @deprecated (Number: number) -> {any},
   DetectedGrab: @deprecated (Number: number) -> vector,
   DetectedGroup: @deprecated (Number: number) -> number,
   DetectedKey: @deprecated (Number: number) -> uuid,
@@ -1135,7 +1062,7 @@ declare llcompat: {
   DetectedTouchUV: @deprecated (Index: number) -> vector,
   DetectedType: @deprecated (Number: number) -> number,
   DetectedVel: @deprecated (Number: number) -> vector,
-  Dialog: @deprecated (AvatarID: uuid, Text: string, Buttons: list, Channel: number) -> (),
+  Dialog: @deprecated (AvatarID: uuid, Text: string, Buttons: {string}, Channel: number) -> (),
   Die: @deprecated () -> (),
   DumpList2String: @deprecated (Source: list, Separator: string) -> string,
   EdgeOfWorld: @deprecated (Position: vector, Direction: vector) -> number,
@@ -1147,7 +1074,7 @@ declare llcompat: {
   ExecCharacterCmd: @deprecated (Command: number, Options: list) -> (),
   Fabs: @deprecated (Value: number) -> number,
   FindNotecardTextCount: @deprecated (NotecardName: string | uuid, Pattern: string, Options: list) -> uuid,
-  FindNotecardTextSync: @deprecated (NotecardName: string | uuid, Pattern: string, StartMatch: number, Count: number, Options: list) -> list,
+  FindNotecardTextSync: @deprecated (NotecardName: string | uuid, Pattern: string, StartMatch: number, Count: number, Options: list) -> {any},
   FleeFrom: @deprecated (Source: vector, Distance: number, Options: list) -> (),
   Floor: @deprecated (Value: number) -> number,
   ForceMouselook: @deprecated (Enable: boolean | number) -> (),
@@ -1156,7 +1083,7 @@ declare llcompat: {
   GetAccel: @deprecated () -> vector,
   GetAgentInfo: @deprecated (AvatarID: uuid) -> number,
   GetAgentLanguage: @deprecated (AvatarID: uuid) -> string,
-  GetAgentList: @deprecated (Scope: number, Options: list) -> list,
+  GetAgentList: @deprecated (Scope: number, Options: list) -> {uuid},
   GetAgentSize: @deprecated (AvatarID: uuid) -> vector,
   GetAlpha: @deprecated (Face: number) -> number,
   GetAndResetTime: @deprecated () -> number,
@@ -1172,7 +1099,7 @@ declare llcompat: {
   GetCameraPos: @deprecated () -> vector,
   GetCameraRot: @deprecated () -> quaternion,
   GetCenterOfMass: @deprecated () -> vector,
-  GetClosestNavPoint: @deprecated (Point: vector, Options: list) -> list,
+  GetClosestNavPoint: @deprecated (Point: vector, Options: list) -> {vector},
   GetColor: @deprecated (Face: number) -> vector,
   GetCreator: @deprecated () -> uuid,
   GetDate: @deprecated () -> string,
@@ -1181,8 +1108,8 @@ declare llcompat: {
   GetDisplayName: @deprecated (AvatarID: uuid) -> string,
   GetEnergy: @deprecated () -> number,
   GetEnv: @deprecated (DataRequest: string) -> string,
-  GetEnvironment: @deprecated (Position: vector, EnvParams: list) -> list,
-  GetExperienceDetails: @deprecated (ExperienceID: uuid) -> list,
+  GetEnvironment: @deprecated (Position: vector, EnvParams: {number}) -> {any},
+  GetExperienceDetails: @deprecated (ExperienceID: uuid) -> {any},
   GetExperienceErrorMessage: @deprecated (Error: number) -> string,
   GetForce: @deprecated () -> vector,
   GetFreeMemory: @deprecated () -> number,
@@ -1202,11 +1129,11 @@ declare llcompat: {
   GetKey: @deprecated () -> uuid,
   GetLandOwnerAt: @deprecated (Position: vector) -> uuid,
   GetLinkKey: @deprecated (LinkNumber: number) -> uuid,
-  GetLinkMedia: @deprecated (LinkNumber: number, Face: number, Parameters: list) -> list,
+  GetLinkMedia: @deprecated (LinkNumber: number, Face: number, Parameters: {number}) -> {any},
   GetLinkName: @deprecated (LinkNumber: number) -> string,
   GetLinkNumber: @deprecated () -> number,
   GetLinkNumberOfSides: @deprecated (LinkNumber: number) -> number,
-  GetLinkPrimitiveParams: @deprecated (LinkNumber: number, Parameters: list) -> list,
+  GetLinkPrimitiveParams: @deprecated (LinkNumber: number, Parameters: {number}) -> {any},
   GetLinkSitFlags: @deprecated (LinkNumber: number) -> number,
   GetListEntryType: @deprecated (ListVariable: list, Index: number) -> number,
   GetListLength: @deprecated (ListVariable: list) -> number,
@@ -1227,7 +1154,7 @@ declare llcompat: {
   GetNumberOfSides: @deprecated () -> number,
   GetObjectAnimationNames: @deprecated () -> {string},
   GetObjectDesc: @deprecated () -> string,
-  GetObjectDetails: @deprecated (ID: uuid, Parameters: list) -> list,
+  GetObjectDetails: @deprecated (ID: uuid, Parameters: {number}) -> {any},
   GetObjectLinkKey: @deprecated (id: uuid, link_no: number) -> uuid,
   GetObjectMass: @deprecated (ID: uuid) -> number,
   GetObjectName: @deprecated () -> string,
@@ -1236,18 +1163,18 @@ declare llcompat: {
   GetOmega: @deprecated () -> vector,
   GetOwner: @deprecated () -> uuid,
   GetOwnerKey: @deprecated (ObjectID: uuid) -> uuid,
-  GetParcelDetails: @deprecated (Position: vector, ParcelDetails: list) -> list,
+  GetParcelDetails: @deprecated (Position: vector, ParcelDetails: {number}) -> {any},
   GetParcelFlags: @deprecated (Position: vector) -> number,
   GetParcelMaxPrims: @deprecated (Position: vector, SimWide: boolean | number) -> number,
   GetParcelMusicURL: @deprecated () -> string,
   GetParcelPrimCount: @deprecated (Position: vector, Category: number, SimWide: boolean | number) -> number,
-  GetParcelPrimOwners: @deprecated (Position: vector) -> list,
+  GetParcelPrimOwners: @deprecated (Position: vector) -> {any},
   GetPermissions: @deprecated () -> number,
   GetPermissionsKey: @deprecated () -> uuid,
-  GetPhysicsMaterial: @deprecated () -> list,
+  GetPhysicsMaterial: @deprecated () -> {number},
   GetPos: @deprecated () -> vector,
-  GetPrimMediaParams: @deprecated (Face: number, Parameters: list) -> list,
-  GetPrimitiveParams: @deprecated (Parameters: list) -> list,
+  GetPrimMediaParams: @deprecated (Face: number, Parameters: {number}) -> {any},
+  GetPrimitiveParams: @deprecated (Parameters: {number}) -> {any},
   GetRegionAgentCount: @deprecated () -> number,
   GetRegionCorner: @deprecated () -> vector,
   GetRegionDayLength: @deprecated () -> number,
@@ -1273,7 +1200,7 @@ declare llcompat: {
   GetSimulatorHostname: @deprecated () -> string,
   GetStartParameter: @deprecated () -> number,
   GetStartString: @deprecated () -> string,
-  GetStaticPath: @deprecated (Start: vector, End: vector, Radius: number, Parameters: list) -> list,
+  GetStaticPath: @deprecated (Start: vector, End: vector, Radius: number, Parameters: list) -> {any},
   GetStatus: @deprecated (StatusFlag: number) -> number,
   GetSubString: @deprecated (String: string, Start: number, End: number) -> string,
   GetSunDirection: @deprecated () -> vector,
@@ -1290,11 +1217,11 @@ declare llcompat: {
   GetUsedMemory: @deprecated () -> number,
   GetUsername: @deprecated (AvatarID: uuid) -> string,
   GetVel: @deprecated () -> vector,
-  GetVisualParams: @deprecated (ID: uuid, Parameters: list) -> list,
+  GetVisualParams: @deprecated (ID: uuid, Parameters: {number | string}) -> {number | ""},
   GetWallclock: @deprecated () -> number,
-  GiveAgentInventory: @deprecated (AgentID: uuid, FolderName: string, InventoryItems: list, Options: list) -> number,
+  GiveAgentInventory: @deprecated (AgentID: uuid, FolderName: string, InventoryItems: {string}, Options: list) -> number,
   GiveInventory: @deprecated (TargetID: uuid, InventoryItem: string) -> (),
-  GiveInventoryList: @deprecated (TargetID: uuid, FolderName: string, InventoryItems: list) -> (),
+  GiveInventoryList: @deprecated (TargetID: uuid, FolderName: string, InventoryItems: {string}) -> (),
   GiveMoney: @deprecated (AvatarID: uuid, Amount: number) -> number,
   GodLikeRezObject: @deprecated (InventoryItemID: uuid, Position: vector) -> (),
   Ground: @deprecated (Offset: vector) -> number,
@@ -1311,7 +1238,7 @@ declare llcompat: {
   IntegerToBase64: @deprecated (Value: number) -> string,
   IsFriend: @deprecated (agent_id: uuid) -> number,
   IsLinkGLTFMaterial: @deprecated (link: number, face: number) -> number,
-  Json2List: @deprecated (JSON: string) -> list,
+  Json2List: @deprecated (JSON: string) -> {any},
   JsonGetValue: @deprecated (JSON: string, Specifiers: list) -> string,
   JsonSetValue: @deprecated (JSON: string, Specifiers: list, Value: string) -> string,
   JsonValueType: @deprecated (JSON: string, Specifiers: list) -> string,
@@ -1330,10 +1257,10 @@ declare llcompat: {
   LinksetDataCountFound: @deprecated (search: string) -> number,
   LinksetDataCountKeys: @deprecated () -> number,
   LinksetDataDelete: @deprecated (name: string) -> number,
-  LinksetDataDeleteFound: @deprecated (search: string, pass: string) -> list,
+  LinksetDataDeleteFound: @deprecated (search: string, pass: string) -> {number},
   LinksetDataDeleteProtected: @deprecated (name: string, pass: string) -> number,
-  LinksetDataFindKeys: @deprecated (search: string, start: number, count: number) -> list,
-  LinksetDataListKeys: @deprecated (start: number, count: number) -> list,
+  LinksetDataFindKeys: @deprecated (search: string, start: number, count: number) -> {string},
+  LinksetDataListKeys: @deprecated (start: number, count: number) -> {string},
   LinksetDataRead: @deprecated (name: string) -> string,
   LinksetDataReadProtected: @deprecated (name: string, pass: string) -> string,
   LinksetDataReset: @deprecated () -> (),
@@ -1391,13 +1318,13 @@ declare llcompat: {
   OverMyLand: @deprecated (ID: uuid) -> number,
   OwnerSay: @deprecated (Text: string) -> (),
   ParcelMediaCommandList: @deprecated (CommandList: list) -> (),
-  ParcelMediaQuery: @deprecated (QueryList: list) -> list,
+  ParcelMediaQuery: @deprecated (QueryList: {number}) -> {any},
   ParseString2List: @deprecated (Text: string, Separators: {string}, Spacers: {string}) -> {string},
   ParseStringKeepNulls: @deprecated (Text: string, Separators: {string}, Spacers: {string}) -> {string},
   ParticleSystem: @deprecated (Parameters: list) -> (),
   PassCollisions: @deprecated (Pass: boolean | number) -> (),
   PassTouches: @deprecated (Pass: boolean | number) -> (),
-  PatrolPoints: @deprecated (Points: list, Options: list) -> (),
+  PatrolPoints: @deprecated (Points: {vector}, Options: list) -> (),
   PlaySound: @deprecated (Sound: string | uuid, Volume: number) -> (),
   PlaySoundSlave: @deprecated (Sound: string | uuid, Volume: number) -> (),
   Pow: @deprecated (Value: number, Exponent: number) -> number,
@@ -1418,8 +1345,8 @@ declare llcompat: {
   RemoveFromLandPassList: @deprecated (AvatarID: uuid) -> (),
   RemoveInventory: @deprecated (InventoryItem: string) -> (),
   RemoveVehicleFlags: @deprecated (Vehiclelags: number) -> (),
-  ReplaceAgentEnvironment: @deprecated (agent_id: uuid, transition: number, environment: string) -> number,
-  ReplaceEnvironment: @deprecated (position: vector, environment: string, track_no: number, day_length: number, day_offset: number) -> number,
+  ReplaceAgentEnvironment: @deprecated (agent_id: uuid, transition: number, environment: string | uuid) -> number,
+  ReplaceEnvironment: @deprecated (position: vector, environment: string | uuid, track_no: number, day_length: number, day_offset: number) -> number,
   ReplaceSubString: @deprecated (InitialString: string, SubString: string, NewSubString: string, Count: number) -> string,
   RequestAgentData: @deprecated (AvatarID: uuid, Data: number) -> uuid,
   RequestDisplayName: @deprecated (AvatarID: uuid) -> uuid,
@@ -1437,7 +1364,7 @@ declare llcompat: {
   ResetOtherScript: @deprecated (ScriptName: string) -> (),
   ResetScript: @deprecated () -> (),
   ResetTime: @deprecated () -> (),
-  ReturnObjectsByID: @deprecated (ObjectIDs: list) -> number,
+  ReturnObjectsByID: @deprecated (ObjectIDs: {uuid}) -> number,
   ReturnObjectsByOwner: @deprecated (ID: uuid, Scope: number) -> number,
   RezAtRoot: @deprecated (InventoryItem: string, Position: vector, Velocity: vector, Rotation: quaternion, StartParameter: number) -> (),
   RezObject: @deprecated (InventoryItem: string, Position: vector, Velocity: vector, Rotation: quaternion, StartParameter: number) -> (),
@@ -1504,7 +1431,7 @@ declare llcompat: {
   SetObjectPermMask: @deprecated (PermissionFlag: number, PermissionMask: number) -> (),
   SetParcelForSale: @deprecated (ForSale: boolean | number, Options: list) -> number,
   SetParcelMusicURL: @deprecated (URL: string) -> (),
-  SetPayPrice: @deprecated (Price: number, QuickButtons: list) -> (),
+  SetPayPrice: @deprecated (Price: number, QuickButtons: {number}) -> (),
   SetPhysicsMaterial: @deprecated (MaterialBits: number, GravityMultiplier: number, Restitution: number, Friction: number, Density: number) -> (),
   SetPos: @deprecated (Position: vector) -> (),
   SetPrimMediaParams: @deprecated (Face: number, MediaParameters: list) -> number,
@@ -1531,7 +1458,7 @@ declare llcompat: {
   SetVehicleRotationParam: @deprecated (ParameterName: number, ParameterValue: quaternion) -> (),
   SetVehicleType: @deprecated (Type: number) -> (),
   SetVehicleVectorParam: @deprecated (ParameterName: number, ParameterValue: vector) -> (),
-  SetVelocity: @deprecated (Velocity: vector, Local: number) -> (),
+  SetVelocity: @deprecated (Velocity: vector, Local: boolean | number) -> (),
   Shout: @deprecated (Channel: number, Text: string) -> (),
   SignRSA: @deprecated (PrivateKey: string, Message: string, Algorithm: string) -> string,
   Sin: @deprecated (Theta: number) -> number,

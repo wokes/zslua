@@ -2,6 +2,7 @@
 //!
 //! Downloads LSL and SLua definition files from GitHub and places them
 //! in the src directory for embedding at compile time.
+//! Falls back to existing local copies with a warning if download fails.
 
 const std = @import("std");
 
@@ -21,34 +22,72 @@ pub fn main() !void {
         return error.InvalidArgs;
     }
 
-    const builtins_output = args[1];
-    const slua_defs_output = args[2];
+    var any_missing = false;
+    if (!fetchOrFallback(allocator, BUILTINS_URL, args[1])) any_missing = true;
+    if (!fetchOrFallback(allocator, SLUA_DEFS_URL, args[2])) any_missing = true;
 
-    // Download builtins.txt
-    std.debug.print("Fetching builtins.txt from {s}...\n", .{BUILTINS_URL});
-    try fetchWithCurl(allocator, BUILTINS_URL, builtins_output);
+    if (any_missing) {
+        std.debug.print("Error: Required definition files are missing and could not be downloaded.\n", .{});
+        std.debug.print("Please check your internet connection and try again.\n", .{});
+        return error.MissingDefinitions;
+    }
+}
 
-    // Download slua_default.d.luau
-    std.debug.print("Fetching slua_default.d.luau from {s}...\n", .{SLUA_DEFS_URL});
-    try fetchWithCurl(allocator, SLUA_DEFS_URL, slua_defs_output);
-
-    std.debug.print("Definition files updated successfully.\n", .{});
+/// Attempts to download the file from url to output_path.
+/// On failure, checks if a local copy exists as fallback.
+/// Returns true if the file is available (fresh or cached), false if missing entirely.
+fn fetchOrFallback(allocator: std.mem.Allocator, url: []const u8, output_path: []const u8) bool {
+    fetchWithCurl(allocator, url, output_path) catch {
+        // Download failed — check if existing local copy can be used as fallback
+        if (fileExists(output_path)) {
+            std.debug.print("Warning: Could not fetch latest {s}, using existing local copy\n", .{output_path});
+            return true;
+        }
+        std.debug.print("Error: Could not fetch {s} and no local copy exists\n", .{output_path});
+        return false;
+    };
+    return true;
 }
 
 fn fetchWithCurl(allocator: std.mem.Allocator, url: []const u8, output_path: []const u8) !void {
-    var child = std.process.Child.init(&.{ "curl", "-fsSL", "-o", output_path, url }, allocator);
-    child.stderr_behavior = .Inherit;
-    child.stdout_behavior = .Inherit;
+    // Download to a temp file to avoid corrupting existing copy on failure
+    const tmp_path = try std.fmt.allocPrint(allocator, "{s}.tmp", .{output_path});
+    defer allocator.free(tmp_path);
+    errdefer {
+        std.fs.cwd().deleteFile(tmp_path) catch {};
+    }
 
-    _ = try child.spawnAndWait();
+    var child = std.process.Child.init(&.{
+        "curl",              "-fsSL",
+        "--connect-timeout", "5",
+        "--max-time",        "15",
+        "-o",                tmp_path,
+        url,
+    }, allocator);
+    child.stderr_behavior = .Ignore;
+    child.stdout_behavior = .Ignore;
 
-    // Verify the file was created
-    const file = std.fs.cwd().openFile(output_path, .{}) catch |err| {
-        std.debug.print("Failed to download {s}: {}\n", .{ output_path, err });
-        return error.DownloadFailed;
+    _ = child.spawnAndWait() catch return error.CurlFailed;
+
+    // Verify the download produced a non-empty file
+    const size = blk: {
+        const file = std.fs.cwd().openFile(tmp_path, .{}) catch return error.DownloadFailed;
+        defer file.close();
+        const stat = file.stat() catch return error.DownloadFailed;
+        break :blk stat.size;
     };
-    const stat = try file.stat();
-    file.close();
+    if (size == 0) return error.DownloadFailed;
 
-    std.debug.print("  -> Wrote {d} bytes to {s}\n", .{ stat.size, output_path });
+    // Replace the existing file with the downloaded one
+    std.fs.cwd().rename(tmp_path, output_path) catch |err| {
+        std.debug.print("Failed to replace {s}: {}\n", .{ output_path, err });
+        return error.RenameFailed;
+    };
+
+    std.debug.print("Updated {s} ({d} bytes)\n", .{ output_path, size });
+}
+
+fn fileExists(path: []const u8) bool {
+    std.fs.cwd().access(path, .{}) catch return false;
+    return true;
 }

@@ -15,8 +15,10 @@ pub fn build(b: *Build) void {
     const lang = .slua;
 
     // =========================================================================
-    // Fetch definitions step (optional, run with `zig build fetch-defs`)
+    // Fetch definitions step
     // Downloads up-to-date builtins.txt and slua_default.d.luau from GitHub
+    // Runs automatically during build; falls back to local copies on failure
+    // Can also be run explicitly: `zig build fetch-defs`
     // =========================================================================
     const native_target = b.resolveTargetQuery(.{});
     const fetch_exe = b.addExecutable(.{
@@ -27,6 +29,7 @@ pub fn build(b: *Build) void {
         }),
     });
     const run_fetch = b.addRunArtifact(fetch_exe);
+    run_fetch.setCwd(b.path("."));
     run_fetch.addArg("src/builtins_data.txt");
     run_fetch.addArg("src/slua_default.d.luau");
 
@@ -51,6 +54,9 @@ pub fn build(b: *Build) void {
         }
 
         const lib = slua_setup.configureWithTailslide(b, target, optimize, upstream, false, tailslide_lib, tailslide_dep);
+
+        // Ensure definitions are fetched before compilation starts
+        lib.step.dependOn(&run_fetch.step);
 
         // Expose the Lua artifact, and get an install step that header translation can refer to
         const install_lib = b.addInstallArtifact(lib, .{});
