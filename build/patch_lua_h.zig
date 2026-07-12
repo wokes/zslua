@@ -43,7 +43,9 @@ pub fn main() !void {
         }
 
         // Skip the original typedef line since we'll add our own
-        if (std.mem.indexOf(u8, line, "typedef std::unordered_set<void*> lua_OpaqueGCObjectSet;") != null) {
+        if (std.mem.indexOf(u8, line, "typedef std::unordered_set<") != null and
+            std.mem.indexOf(u8, line, "lua_OpaqueGCObjectSet;") != null)
+        {
             try patched.appendSlice(allocator, "// ");
             try patched.appendSlice(allocator, line);
             try patched.append(allocator, '\n');

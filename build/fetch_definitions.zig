@@ -6,8 +6,8 @@
 
 const std = @import("std");
 
-const BUILTINS_URL = "https://raw.githubusercontent.com/secondlife/lsl-definitions/main/generated/builtins.txt";
-const SLUA_DEFS_URL = "https://raw.githubusercontent.com/secondlife/lsl-definitions/main/generated/slua_default.d.luau";
+const BUILTINS_URL = "https://raw.githubusercontent.com/secondlife/lsl-definitions/refs/heads/main/generated/builtins.txt";
+const SLUA_DEFS_URL = "https://raw.githubusercontent.com/secondlife/lsl-definitions/refs/heads/main/generated/secondlife.d.luau";
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};

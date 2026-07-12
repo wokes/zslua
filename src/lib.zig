@@ -123,7 +123,7 @@ pub const CInterruptCallbackFn = *const fn (state: ?*LuaState, gc: c_int) callco
 pub const CUserThreadCallbackFn = *const fn (parent: ?*LuaState, child: ?*LuaState) callconv(.c) void;
 
 /// Type for C useratom callback
-pub const CUserAtomCallbackFn = *const fn (str: [*c]const u8, len: usize) callconv(.c) i16;
+pub const CUserAtomCallbackFn = *const fn (state: ?*LuaState, str: [*c]const u8, len: usize) callconv(.c) i16;
 
 /// The internal Lua debug structure
 const Debug = c.lua_Debug;
@@ -5911,7 +5911,7 @@ pub fn wrap(comptime function: anytype) TypeOfWrap(function) {
             }
         }.inner,
         CUserAtomCallbackFn => struct {
-            fn inner(str: [*c]const u8, len: usize) callconv(.c) i16 {
+            fn inner(_: ?*LuaState, str: [*c]const u8, len: usize) callconv(.c) i16 {
                 if (str) |s| {
                     const buf = s[0..len];
                     return @call(.always_inline, function, .{buf});

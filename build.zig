@@ -48,7 +48,10 @@ pub fn build(b: *Build) void {
         // Get tailslide library from zig-tailslide dependency
         var tailslide_lib: ?*Step.Compile = null;
         var tailslide_dep: ?*Build.Dependency = null;
-        if (b.lazyDependency("zig_tailslide", .{})) |ts_dep| {
+        if (b.lazyDependency("zig_tailslide", .{
+            .target = target,
+            .optimize = optimize,
+        })) |ts_dep| {
             tailslide_lib = ts_dep.artifact("tailslide");
             tailslide_dep = ts_dep;
         }

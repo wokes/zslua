@@ -24,7 +24,6 @@ pub fn configureWithTailslide(b: *Build, target: Build.ResolvedTarget, optimize:
     lib.addIncludePath(upstream.path("Compiler/include"));
     lib.addIncludePath(upstream.path("Ast/include"));
     lib.addIncludePath(upstream.path("VM/include"));
-    lib.addIncludePath(upstream.path("VM/src/cjson")); // For strbuf.h header
 
     // Base flags
     const base_flags = [_][]const u8{
@@ -86,8 +85,6 @@ pub fn configureWithTailslide(b: *Build, target: Build.ResolvedTarget, optimize:
         .flags = flags,
     });
     lib.addCSourceFile(.{ .file = b.path("src/luau.cpp"), .flags = flags });
-    // Patched strbuf.cpp for 64-bit Windows compatibility (fixes pointer-to-long cast errors)
-    lib.addCSourceFile(.{ .file = b.path("src/cjson/strbuf.cpp"), .flags = flags });
 
     library.installHeader(upstream.path("VM/include/lua.h"), "lua.h");
     library.installHeader(upstream.path("VM/include/lualib.h"), "lualib.h");
@@ -157,7 +154,13 @@ const luau_source_files = [_][]const u8{
     "VM/src/apr/apr_base64.cpp", // APR base64 encoding/decoding (needed by cjson)
     "VM/src/cjson/lua_cjson.cpp", // JSON library (lljson)
     "VM/src/cjson/fpconv.cpp", // Floating point conversion for cjson
-    // Note: strbuf.cpp is compiled separately from zslua sources with 64-bit Windows fix
+    "VM/src/lstrbuf.cpp", // Yield-safe string buffer
+    "VM/src/lgcfix.cpp", // GC fixup utilities
+    "VM/src/lyieldable.cpp", // Yieldable slot manager
+    "VM/src/lyieldstrlib.cpp", // Yield-safe string library
+    "VM/src/llprim.cpp", // Primitive parameter rule engine
+    "VM/src/llruleset_builder.cpp", // Ruleset builder for prim params
+    "VM/src/miniy2038.cpp", // Year 2038-safe date/time library
 
     "Ast/src/Allocator.cpp",
     "Ast/src/Ast.cpp",
